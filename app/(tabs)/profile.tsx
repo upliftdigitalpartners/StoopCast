@@ -14,6 +14,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/Button";
 import { Pill } from "@/components/Pill";
+import { NeighborhoodCard } from "@/components/NeighborhoodCard";
 import { colors, radius, shadow, space, typography } from "@/lib/theme";
 import { timeAgo } from "@/lib/time";
 import type { Post, Profile } from "@/lib/types";
@@ -78,6 +79,8 @@ export default function ProfileScreen() {
               <Stat label="Posts" value={stats.posts} />
               <Stat label="Claimed" value={stats.claimed} />
             </View>
+
+            <NeighborhoodCard isSet={!!profile?.home_set} onChanged={load} />
 
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Your posts</Text>

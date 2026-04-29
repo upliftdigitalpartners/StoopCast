@@ -21,6 +21,7 @@ export type Profile = {
   handle: string;
   karma: number;
   created_at: string;
+  home_set: boolean;
 };
 
 export type Post = {
