@@ -1,0 +1,198 @@
+import { useState } from "react";
+import {
+  Alert,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import * as Location from "expo-location";
+import * as Notifications from "expo-notifications";
+import { useRouter } from "expo-router";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth";
+import { registerForPushAsync } from "@/lib/notifications";
+import { markWelcomeSkipped } from "@/lib/onboarding";
+import { Button } from "@/components/Button";
+import { Pill } from "@/components/Pill";
+import { colors, radius, shadow, space, typography } from "@/lib/theme";
+
+export default function WelcomeScreen() {
+  const router = useRouter();
+  const { session, refreshHome } = useAuth();
+  const [homeSet, setHomeSet] = useState(false);
+  const [pushSet, setPushSet] = useState(false);
+  const [busyHome, setBusyHome] = useState(false);
+  const [busyPush, setBusyPush] = useState(false);
+
+  const setHome = async () => {
+    setBusyHome(true);
+    try {
+      const perm = await Location.requestForegroundPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert("Location needed", "Allow location to set your neighborhood.");
+        return;
+      }
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      const { error } = await supabase.rpc("set_home_location", {
+        p_lat: loc.coords.latitude,
+        p_lng: loc.coords.longitude,
+      });
+      if (error) throw error;
+      setHomeSet(true);
+      await refreshHome();
+    } catch (e: any) {
+      Alert.alert("Couldn't save", e.message ?? String(e));
+    } finally {
+      setBusyHome(false);
+    }
+  };
+
+  const enablePush = async () => {
+    if (!session?.user?.id) return;
+    setBusyPush(true);
+    try {
+      const perm = await Notifications.requestPermissionsAsync();
+      if (perm.status !== "granted") {
+        Alert.alert("Notifications off", "You can enable them later in your device settings.");
+      } else {
+        const token = await registerForPushAsync(session.user.id);
+        if (token) setPushSet(true);
+      }
+    } catch (e: any) {
+      Alert.alert("Couldn't enable", e.message ?? String(e));
+    } finally {
+      setBusyPush(false);
+    }
+  };
+
+  const finish = async () => {
+    if (session?.user?.id) await refreshHome();
+    router.replace("/(tabs)");
+  };
+
+  const skip = async () => {
+    if (session?.user?.id) await markWelcomeSkipped(session.user.id);
+    router.replace("/(tabs)");
+  };
+
+  const allDone = homeSet && pushSet;
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <ScrollView contentContainerStyle={styles.scroll}>
+        <View style={styles.brand}>
+          <Image source={require("../assets/icon.png")} style={styles.logo} />
+          <Text style={styles.h1}>Welcome to StoopCast</Text>
+          <Text style={styles.tagline}>
+            Two quick steps and you'll know the moment something free shows up on a stoop near you.
+          </Text>
+        </View>
+
+        <Step
+          n={1}
+          title="Set your neighborhood"
+          body="We'll only ping you about stoops within 1.5km of this point. No location, no spam."
+          done={homeSet}
+          ctaLabel={homeSet ? "Saved" : "Use current location"}
+          ctaIcon="📍"
+          onPress={setHome}
+          loading={busyHome}
+        />
+
+        <Step
+          n={2}
+          title="Turn on notifications"
+          body="The 15-minute alert window only matters if your phone buzzes. Promise we won't overdo it."
+          done={pushSet}
+          ctaLabel={pushSet ? "Enabled" : "Enable push"}
+          ctaIcon="🔔"
+          onPress={enablePush}
+          loading={busyPush}
+        />
+
+        <View style={styles.actions}>
+          <Button
+            label={allDone ? "I'm ready — open the map" : "Open the map"}
+            icon={allDone ? "🎉" : "→"}
+            onPress={finish}
+          />
+          <Pressable onPress={skip} style={styles.skip}>
+            <Text style={styles.skipText}>Skip for now</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+function Step({
+  n, title, body, done, ctaLabel, ctaIcon, onPress, loading,
+}: {
+  n: number;
+  title: string;
+  body: string;
+  done: boolean;
+  ctaLabel: string;
+  ctaIcon: string;
+  onPress: () => void;
+  loading?: boolean;
+}) {
+  return (
+    <View style={[styles.card, done && styles.cardDone, shadow(1)]}>
+      <View style={styles.cardHead}>
+        <View style={[styles.numDot, done && styles.numDotDone]}>
+          <Text style={[styles.numText, done && { color: "#fff" }]}>{done ? "✓" : n}</Text>
+        </View>
+        <Text style={styles.cardTitle}>{title}</Text>
+        {done ? <Pill label="done" tone="live" /> : null}
+      </View>
+      <Text style={styles.cardBody}>{body}</Text>
+      <Button
+        label={ctaLabel}
+        icon={ctaIcon}
+        variant={done ? "secondary" : "primary"}
+        onPress={onPress}
+        loading={loading}
+        disabled={done}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.bg },
+  scroll: { padding: space.lg, gap: space.md, paddingBottom: space.xxl },
+
+  brand: { alignItems: "center", gap: 4, marginBottom: space.sm },
+  logo: { width: 72, height: 72, borderRadius: 18, marginBottom: space.sm },
+  h1: { ...typography.h1, color: colors.text, textAlign: "center" },
+  tagline: { ...typography.body, color: colors.muted, textAlign: "center", marginTop: 4 },
+
+  card: {
+    backgroundColor: colors.bgElevated,
+    borderRadius: radius.md,
+    padding: space.md,
+    borderWidth: 1, borderColor: colors.border,
+    gap: space.sm,
+  },
+  cardDone: { borderColor: colors.success, backgroundColor: "#f3faf6" },
+  cardHead: { flexDirection: "row", alignItems: "center", gap: space.sm },
+  numDot: {
+    width: 28, height: 28, borderRadius: 14,
+    borderWidth: 1.5, borderColor: colors.borderStrong,
+    alignItems: "center", justifyContent: "center",
+    backgroundColor: colors.bg,
+  },
+  numDotDone: { backgroundColor: colors.success, borderColor: colors.success },
+  numText: { fontWeight: "800", color: colors.muted, fontSize: 13 },
+  cardTitle: { ...typography.h3, color: colors.text, flex: 1 },
+  cardBody: { ...typography.body, color: colors.muted, lineHeight: 20 },
+
+  actions: { gap: space.sm, marginTop: space.md },
+  skip: { padding: space.sm, alignItems: "center" },
+  skipText: { ...typography.smallStrong, color: colors.muted },
+});
