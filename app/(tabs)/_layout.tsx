@@ -47,6 +47,13 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="activity"
+        options={{
+          title: "Activity",
+          tabBarIcon: ({ focused }) => <Icon char="📰" focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
         name="post"
         options={{
           title: "",

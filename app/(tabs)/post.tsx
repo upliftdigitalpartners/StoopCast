@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   Alert,
+  FlatList,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -26,18 +27,20 @@ import { buzz } from "@/lib/haptics";
 import { colors, radius, shadow, space, typography } from "@/lib/theme";
 
 type LocalPhoto = { uri: string; base64: string; mime: string };
+const MAX_PHOTOS = 4;
 
 export default function PostScreen() {
   const router = useRouter();
   const { session } = useAuth();
-  const [photo, setPhoto] = useState<LocalPhoto | null>(null);
+  const [photos, setPhotos] = useState<LocalPhoto[]>([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState<CategoryId>("furniture");
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const captureWithCamera = async () => {
+  const addFromCamera = async () => {
+    if (photos.length >= MAX_PHOTOS) return Alert.alert(`Max ${MAX_PHOTOS} photos`);
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) return Alert.alert("Camera permission needed");
     const result = await ImagePicker.launchCameraAsync({
@@ -46,26 +49,33 @@ export default function PostScreen() {
     });
     if (!result.canceled && result.assets[0]) {
       const a = result.assets[0];
-      setPhoto({ uri: a.uri, base64: a.base64 ?? "", mime: a.mimeType ?? "image/jpeg" });
+      setPhotos((p) => [...p, { uri: a.uri, base64: a.base64 ?? "", mime: a.mimeType ?? "image/jpeg" }]);
       buzz.light();
-      await captureLocation();
+      if (!coords) await captureLocation();
     }
   };
 
-  const pickFromLibrary = async () => {
+  const addFromLibrary = async () => {
+    if (photos.length >= MAX_PHOTOS) return Alert.alert(`Max ${MAX_PHOTOS} photos`);
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) return Alert.alert("Photo library permission needed");
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.7, base64: true,
+      allowsMultipleSelection: true,
+      selectionLimit: MAX_PHOTOS - photos.length,
     });
-    if (!result.canceled && result.assets[0]) {
-      const a = result.assets[0];
-      setPhoto({ uri: a.uri, base64: a.base64 ?? "", mime: a.mimeType ?? "image/jpeg" });
+    if (!result.canceled) {
+      const next: LocalPhoto[] = result.assets.map((a) => ({
+        uri: a.uri, base64: a.base64 ?? "", mime: a.mimeType ?? "image/jpeg",
+      }));
+      setPhotos((p) => [...p, ...next].slice(0, MAX_PHOTOS));
       buzz.light();
-      await captureLocation();
+      if (!coords) await captureLocation();
     }
   };
+
+  const removePhoto = (i: number) => setPhotos((p) => p.filter((_, idx) => idx !== i));
 
   const captureLocation = async () => {
     const perm = await Location.requestForegroundPermissionsAsync();
@@ -75,31 +85,39 @@ export default function PostScreen() {
     buzz.light();
   };
 
-  const reset = () => { setPhoto(null); setTitle(""); setDescription(""); setCoords(null); setCategory("furniture"); };
+  const reset = () => {
+    setPhotos([]); setTitle(""); setDescription(""); setCoords(null); setCategory("furniture");
+  };
 
   const submit = async () => {
     if (!session?.user) return;
-    if (!photo) return Alert.alert("Add a photo", "Snap a pic of the find first.");
+    if (photos.length === 0) return Alert.alert("Add a photo", "Snap a pic of the find first.");
     if (!title.trim()) return Alert.alert("Add a title", "What is it? e.g. \"Yellow lamp\"");
     if (!coords) return Alert.alert("Need location", "Tap Location to drop the pin.");
 
     setBusy(true);
     try {
-      const ext = photo.mime.includes("png") ? "png" : "jpg";
-      const path = `${session.user.id}/${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage
-        .from("stoop-photos")
-        .upload(path, decodeBase64(photo.base64), { contentType: photo.mime, upsert: false });
-      if (upErr) throw upErr;
-      const { data: pub } = supabase.storage.from("stoop-photos").getPublicUrl(path);
+      const uploaded: string[] = [];
+      for (const p of photos) {
+        const ext = p.mime.includes("png") ? "png" : "jpg";
+        const path = `${session.user.id}/${Date.now()}_${uploaded.length}.${ext}`;
+        const { error: upErr } = await supabase.storage
+          .from("stoop-photos")
+          .upload(path, decodeBase64(p.base64), { contentType: p.mime, upsert: false });
+        if (upErr) throw upErr;
+        const { data: pub } = supabase.storage.from("stoop-photos").getPublicUrl(path);
+        uploaded.push(pub.publicUrl);
+      }
 
+      const [primary, ...rest] = uploaded;
       const { data: postId, error: postErr } = await supabase.rpc("create_post", {
         p_title: title.trim(),
         p_description: description.trim() || null,
-        p_photo_url: pub.publicUrl,
+        p_photo_url: primary,
         p_lat: coords.lat,
         p_lng: coords.lng,
         p_category: category,
+        p_photos: rest,
       });
       if (postErr) throw postErr;
 
@@ -114,7 +132,7 @@ export default function PostScreen() {
     }
   };
 
-  const stepDone = (n: 1 | 2 | 3) => (n === 1 ? !!photo : n === 2 ? !!coords : !!title.trim());
+  const stepDone = (n: 1 | 2 | 3) => (n === 1 ? photos.length > 0 : n === 2 ? !!coords : !!title.trim());
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -133,21 +151,47 @@ export default function PostScreen() {
             <Step n={3} label="Details" done={stepDone(3)} />
           </View>
 
-          {photo ? (
-            <View style={[styles.photoCard, shadow(1)]}>
-              <Image source={{ uri: photo.uri }} style={styles.photo} />
-              <Pressable style={styles.replaceBtn} onPress={() => setPhoto(null)}>
-                <Text style={styles.replaceText}>Replace</Text>
-              </Pressable>
+          {photos.length > 0 ? (
+            <View style={{ gap: space.sm }}>
+              <FlatList
+                data={photos}
+                horizontal
+                keyExtractor={(_, i) => `p${i}`}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 8 }}
+                renderItem={({ item, index }) => (
+                  <View style={styles.thumbWrap}>
+                    <Image source={{ uri: item.uri }} style={styles.thumb} />
+                    {index === 0 ? (
+                      <View style={styles.primaryTag}>
+                        <Text style={styles.primaryTagText}>main</Text>
+                      </View>
+                    ) : null}
+                    <Pressable onPress={() => removePhoto(index)} style={styles.removeBtn}>
+                      <Text style={styles.removeText}>✕</Text>
+                    </Pressable>
+                  </View>
+                )}
+                ListFooterComponent={
+                  photos.length < MAX_PHOTOS ? (
+                    <Pressable onPress={addFromLibrary} style={styles.addThumb}>
+                      <Text style={{ fontSize: 24, color: colors.muted }}>＋</Text>
+                    </Pressable>
+                  ) : null
+                }
+              />
+              <Text style={styles.photoHint}>
+                {photos.length} of {MAX_PHOTOS} · first photo is the main one
+              </Text>
             </View>
           ) : (
             <View style={styles.photoChoiceWrap}>
-              <Pressable onPress={captureWithCamera} style={[styles.photoBig, shadow(1)]}>
+              <Pressable onPress={addFromCamera} style={[styles.photoBig, shadow(1)]}>
                 <Text style={styles.photoBigEmoji}>📷</Text>
                 <Text style={styles.photoBigText}>Take a photo</Text>
-                <Text style={styles.photoBigSub}>fastest path</Text>
+                <Text style={styles.photoBigSub}>up to {MAX_PHOTOS}, first is the cover</Text>
               </Pressable>
-              <Pressable onPress={pickFromLibrary} style={styles.photoSmall}>
+              <Pressable onPress={addFromLibrary} style={styles.photoSmall}>
                 <Text style={styles.photoSmallText}>or pick from library</Text>
               </Pressable>
             </View>
@@ -207,7 +251,7 @@ export default function PostScreen() {
             icon="🚀"
             onPress={submit}
             loading={busy}
-            disabled={!photo || !coords || !title.trim()}
+            disabled={photos.length === 0 || !coords || !title.trim()}
           />
         </ScrollView>
       </KeyboardAvoidingView>
@@ -233,10 +277,7 @@ const styles = StyleSheet.create({
   h1: { ...typography.h1, color: colors.text },
   sub: { ...typography.body, color: colors.muted },
 
-  steps: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    paddingVertical: space.sm,
-  },
+  steps: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: space.sm },
   stepWrap: { alignItems: "center", gap: 4, width: 70 },
   stepDot: {
     width: 30, height: 30, borderRadius: 15,
@@ -249,14 +290,26 @@ const styles = StyleSheet.create({
   stepLabel: { ...typography.tiny, color: colors.muted, textTransform: "none" },
   stepLine: { flex: 1, height: 1.5, backgroundColor: colors.border, marginHorizontal: 4, marginBottom: 16 },
 
-  photoCard: { borderRadius: radius.md, overflow: "hidden", backgroundColor: colors.card },
-  photo: { width: "100%", aspectRatio: 4 / 3 },
-  replaceBtn: {
-    position: "absolute", top: 10, right: 10,
-    backgroundColor: "rgba(20,20,20,0.7)",
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill,
+  thumbWrap: { width: 110, height: 110, borderRadius: radius.md, overflow: "hidden", backgroundColor: "#eee" },
+  thumb: { width: "100%", height: "100%" },
+  primaryTag: {
+    position: "absolute", top: 6, left: 6,
+    backgroundColor: colors.primary, paddingHorizontal: 8, paddingVertical: 2, borderRadius: radius.pill,
   },
-  replaceText: { color: "#fff", fontWeight: "600", fontSize: 12 },
+  primaryTagText: { color: "#fff", fontSize: 10, fontWeight: "800", textTransform: "uppercase" },
+  removeBtn: {
+    position: "absolute", top: 6, right: 6,
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: "rgba(20,20,20,0.7)",
+    alignItems: "center", justifyContent: "center",
+  },
+  removeText: { color: "#fff", fontWeight: "700", fontSize: 12 },
+  addThumb: {
+    width: 110, height: 110, borderRadius: radius.md,
+    borderWidth: 2, borderStyle: "dashed", borderColor: colors.border,
+    alignItems: "center", justifyContent: "center",
+  },
+  photoHint: { ...typography.small, color: colors.muted },
 
   photoChoiceWrap: { gap: space.sm },
   photoBig: {

@@ -4,6 +4,7 @@ import {
   FlatList,
   Image,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -15,40 +16,32 @@ import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/Button";
 import { Pill } from "@/components/Pill";
 import { NeighborhoodCard } from "@/components/NeighborhoodCard";
+import { AchievementBadge } from "@/components/AchievementBadge";
+import { computeAchievements } from "@/lib/achievements";
 import { colors, radius, shadow, space, typography } from "@/lib/theme";
 import { timeAgo } from "@/lib/time";
-import type { Post, Profile } from "@/lib/types";
-
-type Stats = { posts: number; live: number; claimed: number };
+import type { Post, Profile, Stats } from "@/lib/types";
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { session, signOut } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
-  const [stats, setStats] = useState<Stats>({ posts: 0, live: 0, claimed: 0 });
+  const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     if (!session?.user) return;
     setLoading(true);
-    const [{ data: prof }, { data: ps }] = await Promise.all([
+    const [{ data: prof }, { data: ps }, { data: st }] = await Promise.all([
       supabase.from("profiles").select("*").eq("id", session.user.id).single(),
-      supabase
-        .from("posts")
-        .select("*")
-        .eq("poster_id", session.user.id)
-        .order("created_at", { ascending: false })
-        .limit(50),
+      supabase.from("posts").select("*").eq("poster_id", session.user.id)
+        .order("created_at", { ascending: false }).limit(50),
+      supabase.rpc("my_stats"),
     ]);
-    const all = (ps as Post[]) ?? [];
     setProfile((prof as Profile) ?? null);
-    setPosts(all);
-    setStats({
-      posts: all.length,
-      live: all.filter((p) => p.status === "live").length,
-      claimed: all.filter((p) => p.status === "claimed").length,
-    });
+    setPosts((ps as Post[]) ?? []);
+    setStats(((st as Stats[])?.[0]) ?? null);
     setLoading(false);
   }, [session?.user]);
 
@@ -57,6 +50,8 @@ export default function ProfileScreen() {
   if (loading) return <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>;
 
   const initials = (profile?.handle ?? "??").slice(0, 2).toUpperCase();
+  const achievements = computeAchievements(stats);
+  const earned = achievements.filter((a) => a.earned).length;
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -72,19 +67,40 @@ export default function ProfileScreen() {
               </View>
               <Text style={styles.handle}>@{profile?.handle ?? "you"}</Text>
               <Text style={styles.email}>{session?.user?.email}</Text>
+              {stats?.streak_days && stats.streak_days > 0 ? (
+                <View style={styles.streakPill}>
+                  <Text style={styles.streakText}>🔥 {stats.streak_days}-day streak</Text>
+                </View>
+              ) : null}
             </View>
 
             <View style={styles.statsRow}>
               <Stat label="Karma" value={profile?.karma ?? 0} accent />
-              <Stat label="Posts" value={stats.posts} />
-              <Stat label="Claimed" value={stats.claimed} />
+              <Stat label="Posts" value={stats?.posts ?? 0} />
+              <Stat label="Claimed" value={stats?.claims ?? 0} />
             </View>
+
+            {stats && stats.weekly_karma > 0 ? (
+              <Text style={styles.weekly}>
+                ⭐ +{stats.weekly_karma} karma this week
+              </Text>
+            ) : null}
 
             <NeighborhoodCard isSet={!!profile?.home_set} onChanged={load} />
 
             <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Achievements</Text>
+              <Text style={styles.sectionMeta}>{earned} / {achievements.length}</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.badgesRow}>
+              {achievements.map((a) => <AchievementBadge key={a.id} a={a} />)}
+            </ScrollView>
+
+            <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Your posts</Text>
-              {stats.live > 0 ? <Pill label={`${stats.live} live`} tone="live" /> : null}
+              {posts.filter((p) => p.status === "live").length > 0 ? (
+                <Pill label={`${posts.filter((p) => p.status === "live").length} live`} tone="live" />
+              ) : null}
             </View>
           </View>
         }
@@ -155,6 +171,14 @@ const styles = StyleSheet.create({
   avatarText: { color: "#fff", fontSize: 26, fontWeight: "800" },
   handle: { ...typography.h2, color: colors.text },
   email: { ...typography.small, color: colors.muted },
+  streakPill: {
+    marginTop: space.sm,
+    paddingHorizontal: 12, paddingVertical: 6,
+    backgroundColor: "#fff5e6",
+    borderRadius: radius.pill,
+    borderWidth: 1, borderColor: "#f4d9aa",
+  },
+  streakText: { color: colors.warn, fontWeight: "800", fontSize: 13 },
 
   statsRow: { flexDirection: "row", gap: space.sm },
   stat: {
@@ -167,8 +191,12 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 22, fontWeight: "800", color: colors.text },
   statLabel: { ...typography.tiny, color: colors.muted, textTransform: "uppercase" },
 
+  weekly: { ...typography.smallStrong, color: colors.primary, textAlign: "center", marginTop: -8 },
+
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   sectionTitle: { ...typography.h3, color: colors.text },
+  sectionMeta: { ...typography.smallStrong, color: colors.muted },
+  badgesRow: { gap: 8, paddingVertical: 4, paddingRight: space.lg },
 
   empty: { alignItems: "center", padding: space.xl, gap: 4 },
   emptyEmoji: { fontSize: 38 },

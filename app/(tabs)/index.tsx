@@ -10,7 +10,8 @@ import {
   Text,
   View,
 } from "react-native";
-import MapView, { Marker, Region } from "react-native-maps";
+import MapView from "react-native-map-clustering";
+import { Marker, type Region } from "react-native-maps";
 import * as Location from "expo-location";
 import { useFocusEffect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -107,7 +108,7 @@ export default function MapScreen() {
       longitudeDelta: 0.02,
     };
     setRegion(r);
-    mapRef.current?.animateToRegion(r, 600);
+    (mapRef.current as any)?.animateToRegion?.(r, 600);
   };
 
   const toggleFilter = (id: CategoryId) => {
@@ -146,11 +147,14 @@ export default function MapScreen() {
   return (
     <View style={styles.root}>
       <MapView
-        ref={mapRef}
+        ref={mapRef as any}
         style={StyleSheet.absoluteFill}
         initialRegion={region}
         showsUserLocation
         showsMyLocationButton={false}
+        clusterColor={colors.primary}
+        clusterTextColor="#fff"
+        radius={50}
       >
         {visiblePosts.map((p) => (
           <Marker
