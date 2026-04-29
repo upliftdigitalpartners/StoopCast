@@ -3,7 +3,9 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -18,6 +20,9 @@ import { Button } from "@/components/Button";
 import { Pill } from "@/components/Pill";
 import { Countdown } from "@/components/Countdown";
 import { MapPin } from "@/components/MapPin";
+import { CategoryChip } from "@/components/CategoryChip";
+import { categoryOf } from "@/lib/categories";
+import { buzz } from "@/lib/haptics";
 import { colors, radius, shadow, space, typography } from "@/lib/theme";
 import { minutesLeft, timeAgo } from "@/lib/time";
 import { formatDistance } from "@/lib/distance";
@@ -92,11 +97,16 @@ export default function PostDetail() {
         .from("claims")
         .insert({ post_id: row.id, claimer_id: session.user.id });
       if (error) {
-        if (error.code === "23505") Alert.alert("Already claimed", "Someone beat you to it.");
-        else throw error;
+        if (error.code === "23505") {
+          buzz.warn();
+          Alert.alert("Already claimed", "Someone beat you to it.");
+        } else throw error;
+      } else {
+        buzz.success();
       }
       await load();
     } catch (e: any) {
+      buzz.error();
       Alert.alert("Claim failed", e.message ?? String(e));
     } finally {
       setBusy(false);
@@ -109,12 +119,54 @@ export default function PostDetail() {
     try {
       const { error } = await supabase.from("posts").update({ status: "gone" }).eq("id", row.id);
       if (error) throw error;
+      buzz.success();
       await load();
     } catch (e: any) {
+      buzz.error();
       Alert.alert("Update failed", e.message ?? String(e));
     } finally {
       setBusy(false);
     }
+  };
+
+  const deletePost = async () => {
+    if (!row) return;
+    Alert.alert(
+      "Delete this post?",
+      "It will disappear from the map. This can't be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            setBusy(true);
+            try {
+              const { error } = await supabase.rpc("delete_my_post", { p_id: row.id });
+              if (error) throw error;
+              buzz.success();
+              router.back();
+            } catch (e: any) {
+              buzz.error();
+              Alert.alert("Delete failed", e.message ?? String(e));
+            } finally {
+              setBusy(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const sharePost = async () => {
+    if (!row) return;
+    buzz.light();
+    try {
+      await Share.share({
+        title: row.title,
+        message: `📦 ${row.title} — free on a stoop, 15-min window. Open in StoopCast: stoopcast://post/${row.id}`,
+      });
+    } catch {}
   };
 
   if (loading) return <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>;
@@ -127,7 +179,21 @@ export default function PostDetail() {
   return (
     <View style={styles.root}>
       <ScrollView contentContainerStyle={{ paddingBottom: 140 }}>
-        <Image source={{ uri: row.photo_url }} style={styles.hero} />
+        <View>
+          <Image source={{ uri: row.photo_url }} style={styles.hero} />
+          <View style={styles.heroOverlay}>
+            <CategoryChip id={row.category} size="sm" />
+            <View style={{ flex: 1 }} />
+            <Pressable onPress={sharePost} style={[styles.heroBtn, shadow(2)]}>
+              <Text style={styles.heroBtnText}>↗</Text>
+            </Pressable>
+            {isMine ? (
+              <Pressable onPress={deletePost} style={[styles.heroBtn, shadow(2)]}>
+                <Text style={styles.heroBtnText}>🗑</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
 
         <View style={styles.body}>
           <View style={styles.titleRow}>
@@ -201,6 +267,18 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   hero: { width: "100%", aspectRatio: 4 / 3, backgroundColor: "#eee" },
+  heroOverlay: {
+    position: "absolute", left: 0, right: 0, bottom: 0,
+    flexDirection: "row", alignItems: "center", gap: space.sm,
+    paddingHorizontal: space.md, paddingVertical: space.sm,
+  },
+  heroBtn: {
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: "rgba(255,255,255,0.95)",
+    alignItems: "center", justifyContent: "center",
+  },
+  heroBtnText: { fontSize: 16 },
+
   body: { padding: space.lg, gap: space.md },
 
   titleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: space.md },

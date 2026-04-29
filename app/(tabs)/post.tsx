@@ -20,6 +20,9 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/Button";
 import { Pill } from "@/components/Pill";
+import { CategoryChip } from "@/components/CategoryChip";
+import { CATEGORIES, type CategoryId } from "@/lib/categories";
+import { buzz } from "@/lib/haptics";
 import { colors, radius, shadow, space, typography } from "@/lib/theme";
 
 type LocalPhoto = { uri: string; base64: string; mime: string };
@@ -30,6 +33,7 @@ export default function PostScreen() {
   const [photo, setPhoto] = useState<LocalPhoto | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [category, setCategory] = useState<CategoryId>("furniture");
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -43,6 +47,7 @@ export default function PostScreen() {
     if (!result.canceled && result.assets[0]) {
       const a = result.assets[0];
       setPhoto({ uri: a.uri, base64: a.base64 ?? "", mime: a.mimeType ?? "image/jpeg" });
+      buzz.light();
       await captureLocation();
     }
   };
@@ -57,6 +62,7 @@ export default function PostScreen() {
     if (!result.canceled && result.assets[0]) {
       const a = result.assets[0];
       setPhoto({ uri: a.uri, base64: a.base64 ?? "", mime: a.mimeType ?? "image/jpeg" });
+      buzz.light();
       await captureLocation();
     }
   };
@@ -66,9 +72,10 @@ export default function PostScreen() {
     if (!perm.granted) return Alert.alert("Location needed", "We need your location to drop a pin.");
     const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
     setCoords({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+    buzz.light();
   };
 
-  const reset = () => { setPhoto(null); setTitle(""); setDescription(""); setCoords(null); };
+  const reset = () => { setPhoto(null); setTitle(""); setDescription(""); setCoords(null); setCategory("furniture"); };
 
   const submit = async () => {
     if (!session?.user) return;
@@ -92,12 +99,15 @@ export default function PostScreen() {
         p_photo_url: pub.publicUrl,
         p_lat: coords.lat,
         p_lng: coords.lng,
+        p_category: category,
       });
       if (postErr) throw postErr;
 
+      buzz.success();
       reset();
       router.replace(`/post/${postId}`);
     } catch (e: any) {
+      buzz.error();
       Alert.alert("Couldn't post", e.message ?? String(e));
     } finally {
       setBusy(false);
@@ -159,6 +169,18 @@ export default function PostScreen() {
           </Pressable>
 
           <View style={styles.fields}>
+            <Text style={styles.fieldLabel}>Category</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 2 }}>
+              {CATEGORIES.map((c) => (
+                <CategoryChip
+                  key={c.id}
+                  id={c.id}
+                  selected={category === c.id}
+                  onPress={() => { setCategory(c.id); buzz.light(); }}
+                />
+              ))}
+            </ScrollView>
+
             <Text style={styles.fieldLabel}>Title</Text>
             <TextInput
               style={styles.input}

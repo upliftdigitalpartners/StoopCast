@@ -6,6 +6,7 @@ export type NearbyPost = {
   title: string;
   description: string | null;
   photo_url: string;
+  category: string;
   lat: number;
   lng: number;
   status: PostStatus;
@@ -30,6 +31,7 @@ export type Post = {
   title: string;
   description: string | null;
   photo_url: string;
+  category: string;
   status: PostStatus;
   claimed_by: string | null;
   claimed_at: string | null;

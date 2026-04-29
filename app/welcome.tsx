@@ -18,6 +18,7 @@ import { registerForPushAsync } from "@/lib/notifications";
 import { markWelcomeSkipped } from "@/lib/onboarding";
 import { Button } from "@/components/Button";
 import { Pill } from "@/components/Pill";
+import { buzz } from "@/lib/haptics";
 import { colors, radius, shadow, space, typography } from "@/lib/theme";
 
 export default function WelcomeScreen() {
@@ -42,6 +43,7 @@ export default function WelcomeScreen() {
         p_lng: loc.coords.longitude,
       });
       if (error) throw error;
+      buzz.success();
       setHomeSet(true);
       await refreshHome();
     } catch (e: any) {
@@ -60,7 +62,7 @@ export default function WelcomeScreen() {
         Alert.alert("Notifications off", "You can enable them later in your device settings.");
       } else {
         const token = await registerForPushAsync(session.user.id);
-        if (token) setPushSet(true);
+        if (token) { buzz.success(); setPushSet(true); }
       }
     } catch (e: any) {
       Alert.alert("Couldn't enable", e.message ?? String(e));

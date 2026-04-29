@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
   Image,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -19,9 +20,12 @@ import { registerForPushAsync } from "@/lib/notifications";
 import { colors, radius, shadow, space, typography } from "@/lib/theme";
 import { minutesLeft, timeAgo } from "@/lib/time";
 import { formatDistance } from "@/lib/distance";
+import { CATEGORIES, categoryOf, type CategoryId } from "@/lib/categories";
 import { MapPin } from "@/components/MapPin";
 import { Pill } from "@/components/Pill";
 import { Button } from "@/components/Button";
+import { CategoryChip } from "@/components/CategoryChip";
+import { buzz } from "@/lib/haptics";
 import type { NearbyPost } from "@/lib/types";
 
 const DEFAULT_RADIUS_M = 2000;
@@ -35,6 +39,7 @@ export default function MapScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [denied, setDenied] = useState(false);
+  const [filters, setFilters] = useState<Set<CategoryId>>(new Set());
 
   useEffect(() => {
     (async () => {
@@ -62,9 +67,7 @@ export default function MapScreen() {
 
   const loadPosts = useCallback(async (lat: number, lng: number) => {
     const { data, error } = await supabase.rpc("nearby_posts", {
-      lat,
-      lng,
-      radius_m: DEFAULT_RADIUS_M,
+      lat, lng, radius_m: DEFAULT_RADIUS_M,
     });
     if (!error && data) setPosts(data as NearbyPost[]);
     setLoading(false);
@@ -79,17 +82,11 @@ export default function MapScreen() {
       if (region) loadPosts(region.latitude, region.longitude);
       const channel = supabase
         .channel("posts-feed")
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "posts" },
-          () => {
-            if (region) loadPosts(region.latitude, region.longitude);
-          },
-        )
+        .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => {
+          if (region) loadPosts(region.latitude, region.longitude);
+        })
         .subscribe();
-      return () => {
-        supabase.removeChannel(channel);
-      };
+      return () => { supabase.removeChannel(channel); };
     }, [region, loadPosts]),
   );
 
@@ -101,6 +98,7 @@ export default function MapScreen() {
   }, [region, loadPosts]);
 
   const recenter = async () => {
+    buzz.light();
     const loc = await Location.getCurrentPositionAsync({});
     const r = {
       latitude: loc.coords.latitude,
@@ -111,6 +109,20 @@ export default function MapScreen() {
     setRegion(r);
     mapRef.current?.animateToRegion(r, 600);
   };
+
+  const toggleFilter = (id: CategoryId) => {
+    buzz.light();
+    setFilters((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const visiblePosts = useMemo(() => {
+    if (filters.size === 0) return posts;
+    return posts.filter((p) => filters.has((p.category as CategoryId) ?? "other"));
+  }, [posts, filters]);
 
   if (denied) {
     return (
@@ -140,11 +152,11 @@ export default function MapScreen() {
         showsUserLocation
         showsMyLocationButton={false}
       >
-        {posts.map((p) => (
+        {visiblePosts.map((p) => (
           <Marker
             key={p.id}
             coordinate={{ latitude: p.lat, longitude: p.lng }}
-            onPress={() => router.push(`/post/${p.id}`)}
+            onPress={() => { buzz.light(); router.push(`/post/${p.id}`); }}
             tracksViewChanges={false}
             anchor={{ x: 0.5, y: 1 }}
           >
@@ -157,36 +169,74 @@ export default function MapScreen() {
         <View style={[styles.brandPill, shadow(2)]}>
           <View style={styles.livePulse} />
           <Text style={styles.brandText}>StoopCast</Text>
-          <Text style={styles.brandCount}>{posts.length} live</Text>
+          <Text style={styles.brandCount}>{visiblePosts.length} live</Text>
         </View>
         <Pressable onPress={recenter} style={[styles.fab, shadow(2)]}>
           <Text style={{ fontSize: 18 }}>🎯</Text>
         </Pressable>
       </SafeAreaView>
 
+      <View style={styles.filterRow} pointerEvents="box-none">
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterContent}
+        >
+          {filters.size > 0 ? (
+            <Pressable onPress={() => { buzz.light(); setFilters(new Set()); }} style={styles.clearChip}>
+              <Text style={styles.clearChipText}>✕ All</Text>
+            </Pressable>
+          ) : null}
+          {CATEGORIES.map((c) => (
+            <CategoryChip
+              key={c.id}
+              id={c.id}
+              size="sm"
+              selected={filters.has(c.id)}
+              onPress={() => toggleFilter(c.id)}
+            />
+          ))}
+        </ScrollView>
+      </View>
+
       <SafeAreaView edges={["bottom"]} style={styles.sheet}>
         <View style={styles.handle} />
         <View style={styles.sheetHeader}>
           <Text style={styles.sheetTitle}>Nearby stoops</Text>
-          <Text style={styles.sheetSub}>within 2km</Text>
+          <Text style={styles.sheetSub}>
+            {filters.size > 0 ? `${filters.size} filter${filters.size === 1 ? "" : "s"}` : "within 2km"}
+          </Text>
         </View>
-        {posts.length === 0 ? (
+        {visiblePosts.length === 0 ? (
           <View style={styles.empty}>
             <Text style={styles.emptyEmoji}>🛋️</Text>
-            <Text style={styles.emptyTitle}>Nothing live right now</Text>
-            <Text style={styles.emptyBody}>
-              Be the first today — snap a photo of free stuff on a stoop nearby.
+            <Text style={styles.emptyTitle}>
+              {filters.size > 0 ? "Nothing matches that filter" : "Nothing live right now"}
             </Text>
-            <Button
-              label="Post a find"
-              icon="📷"
-              onPress={() => router.push("/(tabs)/post")}
-              style={{ marginTop: space.md }}
-            />
+            <Text style={styles.emptyBody}>
+              {filters.size > 0
+                ? "Clear the filter to see everything nearby."
+                : "Be the first today — snap a photo of free stuff on a stoop nearby."}
+            </Text>
+            {filters.size > 0 ? (
+              <Button
+                label="Clear filter"
+                variant="secondary"
+                onPress={() => setFilters(new Set())}
+                style={{ marginTop: space.md }}
+              />
+            ) : (
+              <Button
+                label="Post a find"
+                icon="📷"
+                onPress={() => router.push("/(tabs)/post")}
+                style={{ marginTop: space.md }}
+              />
+            )}
           </View>
         ) : (
           <FlatList
-            data={posts}
+            data={visiblePosts}
             horizontal
             showsHorizontalScrollIndicator={false}
             keyExtractor={(p) => p.id}
@@ -197,12 +247,16 @@ export default function MapScreen() {
             renderItem={({ item }) => {
               const left = minutesLeft(item.expires_at);
               const tone = left <= 5 ? "warn" : "live";
+              const cat = categoryOf(item.category);
               return (
                 <Pressable
                   style={[styles.card, shadow(1)]}
-                  onPress={() => router.push(`/post/${item.id}`)}
+                  onPress={() => { buzz.light(); router.push(`/post/${item.id}`); }}
                 >
                   <Image source={{ uri: item.photo_url }} style={styles.cardImg} />
+                  <View style={styles.catBadge}>
+                    <Text style={styles.catBadgeText}>{cat.emoji} {cat.label}</Text>
+                  </View>
                   <View style={styles.cardBody}>
                     <Pill label={`${left}m left`} tone={tone} />
                     <Text numberOfLines={1} style={styles.cardTitle}>{item.title}</Text>
@@ -254,6 +308,19 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.border,
   },
 
+  filterRow: {
+    position: "absolute", left: 0, right: 0,
+    top: 70,
+  },
+  filterContent: { paddingHorizontal: space.lg, gap: 6, paddingVertical: 4 },
+  clearChip: {
+    paddingHorizontal: 12, paddingVertical: 5,
+    borderRadius: radius.pill,
+    backgroundColor: colors.text,
+    alignItems: "center", justifyContent: "center",
+  },
+  clearChipText: { color: "#fff", fontWeight: "700", fontSize: 12 },
+
   sheet: {
     position: "absolute", left: 0, right: 0, bottom: 0,
     paddingTop: 8, paddingBottom: space.md,
@@ -287,6 +354,12 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   cardImg: { width: "100%", height: 130, backgroundColor: "#eee" },
+  catBadge: {
+    position: "absolute", top: 8, left: 8,
+    backgroundColor: "rgba(20,20,20,0.78)",
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: radius.pill,
+  },
+  catBadgeText: { color: "#fff", fontWeight: "700", fontSize: 11 },
   cardBody: { padding: 10, gap: 4 },
   cardTitle: { ...typography.bodyStrong, color: colors.text },
   cardMeta: { ...typography.smallStrong, color: colors.textSoft },
