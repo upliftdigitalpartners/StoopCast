@@ -6,7 +6,6 @@
     "orientation": "portrait",
     "scheme": "stoopcast",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
     "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/splash-icon.png",
