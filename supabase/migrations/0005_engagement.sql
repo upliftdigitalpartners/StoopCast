@@ -311,7 +311,7 @@ as $$
        and created_at > now() - interval '60 days'
   ),
   ranked as (
-    select d, row_number() over (order by d desc) - 1 as rn
+    select d, (row_number() over (order by d desc) - 1)::int as rn
       from daily
      where d <= current_date
   ),
