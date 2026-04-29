@@ -1,0 +1,61 @@
+{
+  "expo": {
+    "name": "StoopCast",
+    "slug": "stoopcast",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "stoopcast",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": false,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.stoopcast.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "StoopCast uses your camera to photograph items left on the curb.",
+        "NSPhotoLibraryUsageDescription": "StoopCast accesses your photo library to attach photos to stoop posts.",
+        "NSLocationWhenInUseUsageDescription": "StoopCast uses your location to show nearby stoop finds and place pins on what you post.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "StoopCast uses your location to alert you when free stuff appears on a stoop near you."
+      }
+    },
+    "android": {
+      "package": "com.stoopcast.app",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "CAMERA",
+        "READ_MEDIA_IMAGES"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow StoopCast to use your location to alert you to nearby stoop finds."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow StoopCast to access your camera to photograph stoop finds."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow StoopCast to access your photos to post stoop finds."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#1f8a4c"
+        }
+      ]
+    ],
+    "extra": {
+      "router": { "origin": false }
+    }
+  }
+}
