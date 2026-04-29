@@ -7,6 +7,12 @@
     "scheme": "stoopcast",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#fafaf7"
+    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.stoopcast.app",
@@ -19,6 +25,10 @@
     },
     "android": {
       "package": "com.stoopcast.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#fafaf7"
+      },
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
