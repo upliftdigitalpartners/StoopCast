@@ -19,7 +19,12 @@ create index if not exists posts_category_idx on public.posts (category);
 
 ------------------------------------------------------------------------------
 -- create_post: now accepts category
+-- (drop old signature first; CREATE OR REPLACE can't change return type
+--  or argument list)
 ------------------------------------------------------------------------------
+drop function if exists public.create_post(text, text, text, double precision, double precision);
+drop function if exists public.create_post(text, text, text, double precision, double precision, text);
+
 create or replace function public.create_post(
   p_title text,
   p_description text,
@@ -58,7 +63,10 @@ $$;
 
 ------------------------------------------------------------------------------
 -- nearby_posts: now returns category
+-- (must drop first because the RETURNS TABLE shape changed)
 ------------------------------------------------------------------------------
+drop function if exists public.nearby_posts(double precision, double precision, double precision);
+
 create or replace function public.nearby_posts(
   lat double precision,
   lng double precision,
