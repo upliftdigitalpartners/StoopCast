@@ -89,6 +89,24 @@ npm run start
 
 Push notifications and `react-native-maps` require a real device or a dev-client build, not the Expo Go app's web preview.
 
+## Build an Android APK with EAS (free)
+
+1. Get a Google Maps API key (Google Cloud Console → enable **Maps SDK for Android**) and paste it into `app.json` under `android.config.googleMaps.apiKey`.
+2. Sign up for a free Expo account if you don't have one: <https://expo.dev/signup>.
+3. Install the EAS CLI and log in:
+   ```bash
+   npm install -g eas-cli
+   eas login
+   eas init   # links the repo to a new Expo project (creates an EAS project ID)
+   ```
+4. Build an installable APK on EAS's free queue:
+   ```bash
+   eas build -p android --profile preview
+   ```
+   When the build finishes (~10–30 min on the free queue) EAS prints a download URL; install the APK on any Android phone with USB or "Install from unknown sources" enabled.
+
+For a Play Store-ready AAB later: `eas build -p android --profile production`.
+
 ## Notes & next steps
 
 - `recipients_near` is intentionally simple in the MVP: it returns all push tokens. Replace it with a proper "user neighborhood center" join once users can set a home base.
