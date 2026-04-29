@@ -35,7 +35,14 @@ function AuthGate() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen
         name="post/[id]"
-        options={{ headerShown: true, title: "Stoop find", presentation: "card" }}
+        options={{
+          headerShown: true,
+          title: "",
+          headerTransparent: true,
+          headerBackTitle: "Back",
+          headerTintColor: colors.text,
+          presentation: "card",
+        }}
       />
     </Stack>
   );

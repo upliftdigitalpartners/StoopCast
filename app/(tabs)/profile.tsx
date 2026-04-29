@@ -9,17 +9,23 @@ import {
   View,
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
-import { colors, radius, space } from "@/lib/theme";
+import { Button } from "@/components/Button";
+import { Pill } from "@/components/Pill";
+import { colors, radius, shadow, space, typography } from "@/lib/theme";
 import { timeAgo } from "@/lib/time";
 import type { Post, Profile } from "@/lib/types";
+
+type Stats = { posts: number; live: number; claimed: number };
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { session, signOut } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [stats, setStats] = useState<Stats>({ posts: 0, live: 0, claimed: 0 });
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -34,105 +40,147 @@ export default function ProfileScreen() {
         .order("created_at", { ascending: false })
         .limit(50),
     ]);
+    const all = (ps as Post[]) ?? [];
     setProfile((prof as Profile) ?? null);
-    setPosts((ps as Post[]) ?? []);
+    setPosts(all);
+    setStats({
+      posts: all.length,
+      live: all.filter((p) => p.status === "live").length,
+      claimed: all.filter((p) => p.status === "claimed").length,
+    });
     setLoading(false);
   }, [session?.user]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  if (loading) {
-    return (
-      <View style={styles.center}><ActivityIndicator /></View>
-    );
-  }
+  if (loading) return <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>;
+
+  const initials = (profile?.handle ?? "??").slice(0, 2).toUpperCase();
 
   return (
-    <View style={styles.root}>
-      <View style={styles.header}>
-        <Text style={styles.handle}>@{profile?.handle ?? "you"}</Text>
-        <View style={styles.karmaRow}>
-          <Text style={styles.karmaNum}>⭐ {profile?.karma ?? 0}</Text>
-          <Text style={styles.karmaLabel}>karma</Text>
-        </View>
-        <Text style={styles.email}>{session?.user?.email}</Text>
-      </View>
-
-      <Text style={styles.sectionTitle}>Your posts</Text>
+    <SafeAreaView style={styles.safe} edges={["top"]}>
       <FlatList
         data={posts}
         keyExtractor={(p) => p.id}
-        contentContainerStyle={{ padding: space.lg, gap: space.md }}
+        contentContainerStyle={{ paddingBottom: space.xxl }}
+        ListHeaderComponent={
+          <View style={{ padding: space.lg, gap: space.lg }}>
+            <View style={styles.header}>
+              <View style={[styles.avatar, shadow(1)]}>
+                <Text style={styles.avatarText}>{initials}</Text>
+              </View>
+              <Text style={styles.handle}>@{profile?.handle ?? "you"}</Text>
+              <Text style={styles.email}>{session?.user?.email}</Text>
+            </View>
+
+            <View style={styles.statsRow}>
+              <Stat label="Karma" value={profile?.karma ?? 0} accent />
+              <Stat label="Posts" value={stats.posts} />
+              <Stat label="Claimed" value={stats.claimed} />
+            </View>
+
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Your posts</Text>
+              {stats.live > 0 ? <Pill label={`${stats.live} live`} tone="live" /> : null}
+            </View>
+          </View>
+        }
         ListEmptyComponent={
-          <Text style={styles.empty}>You haven't posted anything yet.</Text>
+          <View style={styles.empty}>
+            <Text style={styles.emptyEmoji}>🪑</Text>
+            <Text style={styles.emptyTitle}>No posts yet</Text>
+            <Text style={styles.emptyBody}>Spot something free on a stoop? Snap it and earn karma.</Text>
+            <Button
+              label="Post your first find"
+              icon="📷"
+              onPress={() => router.push("/(tabs)/post")}
+              style={{ marginTop: space.md }}
+            />
+          </View>
         }
         renderItem={({ item }) => (
-          <Pressable style={styles.row} onPress={() => router.push(`/post/${item.id}`)}>
+          <Pressable
+            style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
+            onPress={() => router.push(`/post/${item.id}`)}
+          >
             <Image source={{ uri: item.photo_url }} style={styles.thumb} />
-            <View style={{ flex: 1, gap: 2 }}>
+            <View style={{ flex: 1, gap: 4 }}>
               <Text style={styles.rowTitle} numberOfLines={1}>{item.title}</Text>
-              <Text style={styles.rowMeta}>
-                {item.status} · {timeAgo(item.created_at)}
-              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Pill
+                  label={item.status}
+                  tone={item.status === "live" ? "live" : item.status === "claimed" ? "warn" : "claimed"}
+                />
+                <Text style={styles.rowMeta}>{timeAgo(item.created_at)}</Text>
+              </View>
             </View>
+            <Text style={styles.rowChevron}>›</Text>
           </Pressable>
         )}
+        ListFooterComponent={
+          <View style={{ padding: space.lg }}>
+            <Button label="Sign out" variant="danger" onPress={signOut} />
+          </View>
+        }
       />
+    </SafeAreaView>
+  );
+}
 
-      <Pressable onPress={signOut} style={styles.signOut}>
-        <Text style={styles.signOutText}>Sign out</Text>
-      </Pressable>
+function Stat({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
+  return (
+    <View style={[styles.stat, accent && styles.statAccent, shadow(1)]}>
+      <Text style={[styles.statValue, accent && { color: colors.primary }]}>
+        {accent ? "⭐ " : ""}{value}
+      </Text>
+      <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
+  safe: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  header: {
-    padding: space.lg,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    alignItems: "center",
-    gap: space.xs,
-  },
-  handle: { fontSize: 22, fontWeight: "800", color: colors.text },
-  karmaRow: { flexDirection: "row", alignItems: "baseline", gap: space.sm },
-  karmaNum: { fontSize: 28, fontWeight: "800", color: colors.primary },
-  karmaLabel: { color: colors.muted },
-  email: { color: colors.muted, fontSize: 13 },
 
-  sectionTitle: {
-    fontWeight: "700",
-    color: colors.text,
-    paddingHorizontal: space.lg,
-    paddingTop: space.lg,
+  header: { alignItems: "center", gap: space.xs },
+  avatar: {
+    width: 72, height: 72, borderRadius: 36,
+    backgroundColor: colors.primary,
+    alignItems: "center", justifyContent: "center",
+    marginBottom: space.sm,
   },
-  empty: { color: colors.muted, textAlign: "center", marginTop: space.xl },
+  avatarText: { color: "#fff", fontSize: 26, fontWeight: "800" },
+  handle: { ...typography.h2, color: colors.text },
+  email: { ...typography.small, color: colors.muted },
+
+  statsRow: { flexDirection: "row", gap: space.sm },
+  stat: {
+    flex: 1, backgroundColor: colors.bgElevated,
+    paddingVertical: space.md, paddingHorizontal: space.sm,
+    borderRadius: radius.md, alignItems: "center",
+    borderWidth: 1, borderColor: colors.border, gap: 2,
+  },
+  statAccent: { borderColor: colors.primary, backgroundColor: "#fff" },
+  statValue: { fontSize: 22, fontWeight: "800", color: colors.text },
+  statLabel: { ...typography.tiny, color: colors.muted, textTransform: "uppercase" },
+
+  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  sectionTitle: { ...typography.h3, color: colors.text },
+
+  empty: { alignItems: "center", padding: space.xl, gap: 4 },
+  emptyEmoji: { fontSize: 38 },
+  emptyTitle: { ...typography.h3, color: colors.text, marginTop: space.sm },
+  emptyBody: { ...typography.body, color: colors.muted, textAlign: "center" },
+
   row: {
-    flexDirection: "row",
-    backgroundColor: "#fff",
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: "hidden",
-    padding: space.sm,
-    gap: space.md,
-    alignItems: "center",
+    flexDirection: "row", alignItems: "center", gap: space.md,
+    paddingVertical: space.sm, paddingHorizontal: space.lg,
+    backgroundColor: colors.bgElevated, marginHorizontal: space.lg,
+    marginBottom: space.sm, borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.border,
   },
-  thumb: { width: 64, height: 64, borderRadius: radius.sm, backgroundColor: "#eee" },
-  rowTitle: { fontWeight: "700", color: colors.text },
-  rowMeta: { color: colors.muted, fontSize: 12 },
-
-  signOut: {
-    margin: space.lg,
-    padding: space.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    backgroundColor: "#fff",
-  },
-  signOutText: { color: colors.danger, fontWeight: "600" },
+  thumb: { width: 56, height: 56, borderRadius: radius.sm, backgroundColor: "#eee" },
+  rowTitle: { ...typography.bodyStrong, color: colors.text },
+  rowMeta: { ...typography.small, color: colors.muted },
+  rowChevron: { fontSize: 24, color: colors.muted },
 });

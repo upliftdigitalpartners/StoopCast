@@ -1,8 +1,9 @@
 import { useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,9 +15,12 @@ import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { decode as decodeBase64 } from "base64-arraybuffer";
 import { useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
-import { colors, radius, space } from "@/lib/theme";
+import { Button } from "@/components/Button";
+import { Pill } from "@/components/Pill";
+import { colors, radius, shadow, space, typography } from "@/lib/theme";
 
 type LocalPhoto = { uri: string; base64: string; mime: string };
 
@@ -31,16 +35,10 @@ export default function PostScreen() {
 
   const captureWithCamera = async () => {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert("Camera permission needed");
-      return;
-    }
+    if (!perm.granted) return Alert.alert("Camera permission needed");
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: false,
-      quality: 0.7,
-      base64: true,
-      exif: false,
+      quality: 0.7, base64: true, exif: false,
     });
     if (!result.canceled && result.assets[0]) {
       const a = result.assets[0];
@@ -51,14 +49,10 @@ export default function PostScreen() {
 
   const pickFromLibrary = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert("Photo library permission needed");
-      return;
-    }
+    if (!perm.granted) return Alert.alert("Photo library permission needed");
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.7,
-      base64: true,
+      quality: 0.7, base64: true,
     });
     if (!result.canceled && result.assets[0]) {
       const a = result.assets[0];
@@ -69,26 +63,18 @@ export default function PostScreen() {
 
   const captureLocation = async () => {
     const perm = await Location.requestForegroundPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert("Location needed", "We need your location to drop a pin on the stoop.");
-      return;
-    }
+    if (!perm.granted) return Alert.alert("Location needed", "We need your location to drop a pin.");
     const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
     setCoords({ lat: loc.coords.latitude, lng: loc.coords.longitude });
   };
 
-  const reset = () => {
-    setPhoto(null);
-    setTitle("");
-    setDescription("");
-    setCoords(null);
-  };
+  const reset = () => { setPhoto(null); setTitle(""); setDescription(""); setCoords(null); };
 
   const submit = async () => {
     if (!session?.user) return;
-    if (!photo) return Alert.alert("Add a photo", "Snap a pic of the stoop find first.");
+    if (!photo) return Alert.alert("Add a photo", "Snap a pic of the find first.");
     if (!title.trim()) return Alert.alert("Add a title", "What is it? e.g. \"Yellow lamp\"");
-    if (!coords) return Alert.alert("Need location", "Tap location to drop the pin.");
+    if (!coords) return Alert.alert("Need location", "Tap Location to drop the pin.");
 
     setBusy(true);
     try {
@@ -96,12 +82,8 @@ export default function PostScreen() {
       const path = `${session.user.id}/${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage
         .from("stoop-photos")
-        .upload(path, decodeBase64(photo.base64), {
-          contentType: photo.mime,
-          upsert: false,
-        });
+        .upload(path, decodeBase64(photo.base64), { contentType: photo.mime, upsert: false });
       if (upErr) throw upErr;
-
       const { data: pub } = supabase.storage.from("stoop-photos").getPublicUrl(path);
 
       const { data: postId, error: postErr } = await supabase.rpc("create_post", {
@@ -122,121 +104,169 @@ export default function PostScreen() {
     }
   };
 
+  const stepDone = (n: 1 | 2 | 3) => (n === 1 ? !!photo : n === 2 ? !!coords : !!title.trim());
+
   return (
-    <ScrollView style={styles.root} contentContainerStyle={{ padding: space.lg, gap: space.md }}>
-      <Text style={styles.heading}>Post a stoop find</Text>
-      <Text style={styles.sub}>
-        Snap, drop a pin, and nearby neighbors get a 15-minute alert.
-      </Text>
+    <SafeAreaView style={styles.safe} edges={["top"]}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+          <View style={styles.header}>
+            <Text style={styles.h1}>Post a find</Text>
+            <Text style={styles.sub}>15-minute alert window starts when you publish.</Text>
+          </View>
 
-      {photo ? (
-        <View>
-          <Image source={{ uri: photo.uri }} style={styles.photo} />
-          <Pressable onPress={() => setPhoto(null)} style={styles.linkBtn}>
-            <Text style={styles.link}>Replace photo</Text>
+          <View style={styles.steps}>
+            <Step n={1} label="Photo" done={stepDone(1)} />
+            <View style={styles.stepLine} />
+            <Step n={2} label="Pin" done={stepDone(2)} />
+            <View style={styles.stepLine} />
+            <Step n={3} label="Details" done={stepDone(3)} />
+          </View>
+
+          {photo ? (
+            <View style={[styles.photoCard, shadow(1)]}>
+              <Image source={{ uri: photo.uri }} style={styles.photo} />
+              <Pressable style={styles.replaceBtn} onPress={() => setPhoto(null)}>
+                <Text style={styles.replaceText}>Replace</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.photoChoiceWrap}>
+              <Pressable onPress={captureWithCamera} style={[styles.photoBig, shadow(1)]}>
+                <Text style={styles.photoBigEmoji}>📷</Text>
+                <Text style={styles.photoBigText}>Take a photo</Text>
+                <Text style={styles.photoBigSub}>fastest path</Text>
+              </Pressable>
+              <Pressable onPress={pickFromLibrary} style={styles.photoSmall}>
+                <Text style={styles.photoSmallText}>or pick from library</Text>
+              </Pressable>
+            </View>
+          )}
+
+          <Pressable onPress={captureLocation} style={[styles.locCard, coords && styles.locCardSet]}>
+            <View style={{ flex: 1 }}>
+              <View style={styles.locTopRow}>
+                <Text style={styles.locLabel}>Drop a pin</Text>
+                {coords ? <Pill label="set" tone="live" /> : null}
+              </View>
+              <Text style={[styles.locValue, !coords && { color: colors.muted }]}>
+                {coords
+                  ? `${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`
+                  : "Tap to use current location"}
+              </Text>
+            </View>
+            <Text style={styles.locArrow}>{coords ? "↻" : "📍"}</Text>
           </Pressable>
-        </View>
-      ) : (
-        <View style={{ gap: space.sm }}>
-          <Pressable onPress={captureWithCamera} style={styles.primaryBtn}>
-            <Text style={styles.primaryBtnText}>📷 Take a photo</Text>
-          </Pressable>
-          <Pressable onPress={pickFromLibrary} style={styles.secondaryBtn}>
-            <Text style={styles.secondaryBtnText}>Pick from library</Text>
-          </Pressable>
-        </View>
-      )}
 
-      <TextInput
-        style={styles.input}
-        placeholder="Title (e.g. Yellow lamp)"
-        value={title}
-        onChangeText={setTitle}
-        maxLength={80}
-        placeholderTextColor={colors.muted}
-      />
-      <TextInput
-        style={[styles.input, { height: 90, textAlignVertical: "top" }]}
-        placeholder="Description (optional) — condition, brand, anything to know"
-        value={description}
-        onChangeText={setDescription}
-        multiline
-        maxLength={500}
-        placeholderTextColor={colors.muted}
-      />
+          <View style={styles.fields}>
+            <Text style={styles.fieldLabel}>Title</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Yellow lamp"
+              value={title}
+              onChangeText={setTitle}
+              maxLength={80}
+              placeholderTextColor={colors.muted}
+            />
+            <Text style={styles.fieldLabel}>Description (optional)</Text>
+            <TextInput
+              style={[styles.input, styles.textarea]}
+              placeholder="Condition, brand, anything to know"
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              maxLength={500}
+              placeholderTextColor={colors.muted}
+            />
+          </View>
 
-      <Pressable onPress={captureLocation} style={styles.locBox}>
-        <Text style={styles.locLabel}>📍 Location</Text>
-        <Text style={styles.locValue}>
-          {coords
-            ? `${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`
-            : "Tap to use current location"}
-        </Text>
-      </Pressable>
+          <Button
+            label="Publish — start 15-min window"
+            icon="🚀"
+            onPress={submit}
+            loading={busy}
+            disabled={!photo || !coords || !title.trim()}
+          />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
 
-      <Pressable
-        onPress={submit}
-        disabled={busy}
-        style={({ pressed }) => [
-          styles.primaryBtn,
-          { marginTop: space.md },
-          (busy || pressed) && { opacity: 0.7 },
-        ]}
-      >
-        {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Post — start the 15-min window</Text>}
-      </Pressable>
-    </ScrollView>
+function Step({ n, label, done }: { n: number; label: string; done: boolean }) {
+  return (
+    <View style={styles.stepWrap}>
+      <View style={[styles.stepDot, done && styles.stepDotDone]}>
+        <Text style={[styles.stepDotText, done && { color: "#fff" }]}>{done ? "✓" : n}</Text>
+      </View>
+      <Text style={[styles.stepLabel, done && { color: colors.text }]}>{label}</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
-  heading: { fontSize: 22, fontWeight: "800", color: colors.text },
-  sub: { color: colors.muted },
+  safe: { flex: 1, backgroundColor: colors.bg },
+  scroll: { padding: space.lg, gap: space.md, paddingBottom: space.xxl },
+  header: { gap: 4, marginBottom: space.xs },
+  h1: { ...typography.h1, color: colors.text },
+  sub: { ...typography.body, color: colors.muted },
 
-  photo: {
-    width: "100%",
-    aspectRatio: 4 / 3,
-    backgroundColor: "#eee",
-    borderRadius: radius.md,
+  steps: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingVertical: space.sm,
   },
-  linkBtn: { padding: space.sm, alignSelf: "center" },
-  link: { color: colors.primary, fontWeight: "600" },
+  stepWrap: { alignItems: "center", gap: 4, width: 70 },
+  stepDot: {
+    width: 30, height: 30, borderRadius: 15,
+    borderWidth: 1.5, borderColor: colors.borderStrong,
+    alignItems: "center", justifyContent: "center",
+    backgroundColor: colors.bgElevated,
+  },
+  stepDotDone: { backgroundColor: colors.success, borderColor: colors.success },
+  stepDotText: { fontWeight: "700", color: colors.muted, fontSize: 13 },
+  stepLabel: { ...typography.tiny, color: colors.muted, textTransform: "none" },
+  stepLine: { flex: 1, height: 1.5, backgroundColor: colors.border, marginHorizontal: 4, marginBottom: 16 },
 
+  photoCard: { borderRadius: radius.md, overflow: "hidden", backgroundColor: colors.card },
+  photo: { width: "100%", aspectRatio: 4 / 3 },
+  replaceBtn: {
+    position: "absolute", top: 10, right: 10,
+    backgroundColor: "rgba(20,20,20,0.7)",
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill,
+  },
+  replaceText: { color: "#fff", fontWeight: "600", fontSize: 12 },
+
+  photoChoiceWrap: { gap: space.sm },
+  photoBig: {
+    backgroundColor: colors.bgElevated,
+    borderRadius: radius.lg, padding: space.xl,
+    borderWidth: 2, borderColor: colors.border, borderStyle: "dashed",
+    alignItems: "center", gap: 4,
+  },
+  photoBigEmoji: { fontSize: 38 },
+  photoBigText: { ...typography.h3, color: colors.text },
+  photoBigSub: { ...typography.small, color: colors.muted },
+  photoSmall: { padding: space.sm, alignItems: "center" },
+  photoSmallText: { ...typography.smallStrong, color: colors.primary },
+
+  locCard: {
+    flexDirection: "row", alignItems: "center", gap: space.md,
+    backgroundColor: colors.bgElevated,
+    borderRadius: radius.md, padding: space.md,
+    borderWidth: 1, borderColor: colors.border,
+  },
+  locCardSet: { borderColor: colors.success, backgroundColor: "#f3faf6" },
+  locTopRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 2 },
+  locLabel: { ...typography.smallStrong, color: colors.muted, textTransform: "uppercase", letterSpacing: 0.4 },
+  locValue: { ...typography.bodyStrong, color: colors.text },
+  locArrow: { fontSize: 22 },
+
+  fields: { gap: space.sm },
+  fieldLabel: { ...typography.smallStrong, color: colors.muted, textTransform: "uppercase", letterSpacing: 0.4, marginTop: 4 },
   input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: space.md,
-    backgroundColor: "#fff",
-    color: colors.text,
-    fontSize: 16,
+    borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
+    padding: space.md, backgroundColor: colors.bgElevated,
+    color: colors.text, fontSize: 16,
   },
-
-  locBox: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: space.md,
-    backgroundColor: "#fff",
-  },
-  locLabel: { color: colors.muted, fontSize: 12, marginBottom: 2 },
-  locValue: { color: colors.text, fontSize: 15, fontWeight: "600" },
-
-  primaryBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    padding: space.md,
-    alignItems: "center",
-  },
-  primaryBtnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-  secondaryBtn: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: space.md,
-    alignItems: "center",
-    backgroundColor: "#fff",
-  },
-  secondaryBtnText: { color: colors.text, fontWeight: "600", fontSize: 15 },
+  textarea: { height: 100, textAlignVertical: "top" },
 });

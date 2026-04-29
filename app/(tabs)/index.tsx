@@ -4,6 +4,7 @@ import {
   FlatList,
   Image,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   View,
@@ -11,11 +12,16 @@ import {
 import MapView, { Marker, Region } from "react-native-maps";
 import * as Location from "expo-location";
 import { useFocusEffect, useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { registerForPushAsync } from "@/lib/notifications";
-import { colors, radius, space } from "@/lib/theme";
+import { colors, radius, shadow, space, typography } from "@/lib/theme";
 import { minutesLeft, timeAgo } from "@/lib/time";
+import { formatDistance } from "@/lib/distance";
+import { MapPin } from "@/components/MapPin";
+import { Pill } from "@/components/Pill";
+import { Button } from "@/components/Button";
 import type { NearbyPost } from "@/lib/types";
 
 const DEFAULT_RADIUS_M = 2000;
@@ -27,9 +33,9 @@ export default function MapScreen() {
   const [region, setRegion] = useState<Region | null>(null);
   const [posts, setPosts] = useState<NearbyPost[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [denied, setDenied] = useState(false);
 
-  // Acquire location once.
   useEffect(() => {
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -48,7 +54,6 @@ export default function MapScreen() {
     })();
   }, []);
 
-  // Register for push once we have a session.
   useEffect(() => {
     if (session?.user?.id) {
       registerForPushAsync(session.user.id).catch(() => {});
@@ -69,7 +74,6 @@ export default function MapScreen() {
     if (region) loadPosts(region.latitude, region.longitude);
   }, [region, loadPosts]);
 
-  // Refresh on focus + subscribe to live changes.
   useFocusEffect(
     useCallback(() => {
       if (region) loadPosts(region.latitude, region.longitude);
@@ -89,20 +93,40 @@ export default function MapScreen() {
     }, [region, loadPosts]),
   );
 
+  const onRefresh = useCallback(async () => {
+    if (!region) return;
+    setRefreshing(true);
+    await loadPosts(region.latitude, region.longitude);
+    setRefreshing(false);
+  }, [region, loadPosts]);
+
+  const recenter = async () => {
+    const loc = await Location.getCurrentPositionAsync({});
+    const r = {
+      latitude: loc.coords.latitude,
+      longitude: loc.coords.longitude,
+      latitudeDelta: 0.02,
+      longitudeDelta: 0.02,
+    };
+    setRegion(r);
+    mapRef.current?.animateToRegion(r, 600);
+  };
+
   if (denied) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.deniedTitle}>Location needed</Text>
+      <SafeAreaView style={styles.center} edges={["top", "bottom"]}>
+        <Text style={styles.deniedTitle}>Location is needed</Text>
         <Text style={styles.deniedBody}>
-          StoopCast shows free stuff near you — please enable location in Settings.
+          StoopCast shows free stuff near you and lets you alert neighbors when you spot something. Enable location in Settings to continue.
         </Text>
-      </View>
+      </SafeAreaView>
     );
   }
   if (loading || !region) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator />
+        <ActivityIndicator color={colors.primary} />
+        <Text style={styles.loading}>Finding your block…</Text>
       </View>
     );
   }
@@ -111,32 +135,55 @@ export default function MapScreen() {
     <View style={styles.root}>
       <MapView
         ref={mapRef}
-        style={styles.map}
+        style={StyleSheet.absoluteFill}
         initialRegion={region}
         showsUserLocation
-        showsMyLocationButton
+        showsMyLocationButton={false}
       >
         {posts.map((p) => (
           <Marker
             key={p.id}
             coordinate={{ latitude: p.lat, longitude: p.lng }}
-            title={p.title}
-            description={`${minutesLeft(p.expires_at)}m left · @${p.poster_handle}`}
-            pinColor={colors.pin}
-            onCalloutPress={() => router.push(`/post/${p.id}`)}
-          />
+            onPress={() => router.push(`/post/${p.id}`)}
+            tracksViewChanges={false}
+            anchor={{ x: 0.5, y: 1 }}
+          >
+            <MapPin minutesLeft={minutesLeft(p.expires_at)} status={p.status} />
+          </Marker>
         ))}
       </MapView>
 
-      <View style={styles.sheet}>
+      <SafeAreaView edges={["top"]} style={styles.topBar} pointerEvents="box-none">
+        <View style={[styles.brandPill, shadow(2)]}>
+          <View style={styles.livePulse} />
+          <Text style={styles.brandText}>StoopCast</Text>
+          <Text style={styles.brandCount}>{posts.length} live</Text>
+        </View>
+        <Pressable onPress={recenter} style={[styles.fab, shadow(2)]}>
+          <Text style={{ fontSize: 18 }}>🎯</Text>
+        </Pressable>
+      </SafeAreaView>
+
+      <SafeAreaView edges={["bottom"]} style={styles.sheet}>
+        <View style={styles.handle} />
         <View style={styles.sheetHeader}>
           <Text style={styles.sheetTitle}>Nearby stoops</Text>
-          <Text style={styles.sheetCount}>{posts.length} live</Text>
+          <Text style={styles.sheetSub}>within 2km</Text>
         </View>
         {posts.length === 0 ? (
-          <Text style={styles.empty}>
-            Nothing live within 2km. Be the first — tap Post.
-          </Text>
+          <View style={styles.empty}>
+            <Text style={styles.emptyEmoji}>🛋️</Text>
+            <Text style={styles.emptyTitle}>Nothing live right now</Text>
+            <Text style={styles.emptyBody}>
+              Be the first today — snap a photo of free stuff on a stoop nearby.
+            </Text>
+            <Button
+              label="Post a find"
+              icon="📷"
+              onPress={() => router.push("/(tabs)/post")}
+              style={{ marginTop: space.md }}
+            />
+          </View>
         ) : (
           <FlatList
             data={posts}
@@ -144,68 +191,104 @@ export default function MapScreen() {
             showsHorizontalScrollIndicator={false}
             keyExtractor={(p) => p.id}
             contentContainerStyle={{ paddingHorizontal: space.lg, gap: space.md }}
-            renderItem={({ item }) => (
-              <Pressable
-                style={styles.card}
-                onPress={() => router.push(`/post/${item.id}`)}
-              >
-                <Image source={{ uri: item.photo_url }} style={styles.cardImg} />
-                <View style={{ padding: space.sm, gap: 2 }}>
-                  <Text numberOfLines={1} style={styles.cardTitle}>{item.title}</Text>
-                  <Text style={styles.cardMeta}>
-                    {minutesLeft(item.expires_at)}m left · {Math.round(item.distance_m)}m
-                  </Text>
-                  <Text style={styles.cardMeta}>
-                    @{item.poster_handle} · ⭐ {item.poster_karma} · {timeAgo(item.created_at)}
-                  </Text>
-                </View>
-              </Pressable>
-            )}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+            }
+            renderItem={({ item }) => {
+              const left = minutesLeft(item.expires_at);
+              const tone = left <= 5 ? "warn" : "live";
+              return (
+                <Pressable
+                  style={[styles.card, shadow(1)]}
+                  onPress={() => router.push(`/post/${item.id}`)}
+                >
+                  <Image source={{ uri: item.photo_url }} style={styles.cardImg} />
+                  <View style={styles.cardBody}>
+                    <Pill label={`${left}m left`} tone={tone} />
+                    <Text numberOfLines={1} style={styles.cardTitle}>{item.title}</Text>
+                    <Text style={styles.cardMeta}>{formatDistance(item.distance_m)}</Text>
+                    <Text style={styles.cardMetaSoft}>
+                      @{item.poster_handle} · ⭐ {item.poster_karma} · {timeAgo(item.created_at)}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            }}
           />
         )}
-      </View>
+      </SafeAreaView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  map: { flex: 1 },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: space.xl, backgroundColor: colors.bg },
-  deniedTitle: { fontSize: 18, fontWeight: "700", color: colors.text, marginBottom: space.sm },
-  deniedBody: { color: colors.muted, textAlign: "center" },
+  center: {
+    flex: 1, alignItems: "center", justifyContent: "center",
+    padding: space.xl, backgroundColor: colors.bg, gap: space.md,
+  },
+  loading: { color: colors.muted },
+  deniedTitle: { ...typography.h2, color: colors.text },
+  deniedBody: { ...typography.body, color: colors.muted, textAlign: "center" },
+
+  topBar: {
+    position: "absolute",
+    top: 0, left: 0, right: 0,
+    paddingHorizontal: space.lg, paddingTop: space.sm,
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+  },
+  brandPill: {
+    flexDirection: "row", alignItems: "center", gap: space.sm,
+    backgroundColor: colors.bgElevated,
+    borderRadius: radius.pill,
+    paddingHorizontal: 14, paddingVertical: 8,
+    borderWidth: 1, borderColor: colors.border,
+  },
+  livePulse: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.success },
+  brandText: { ...typography.bodyStrong, color: colors.text },
+  brandCount: { ...typography.smallStrong, color: colors.muted },
+  fab: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: colors.bgElevated,
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 1, borderColor: colors.border,
+  },
 
   sheet: {
-    position: "absolute",
-    left: 0, right: 0, bottom: 0,
-    paddingBottom: space.lg,
-    paddingTop: space.md,
-    backgroundColor: "rgba(255,255,255,0.96)",
-    borderTopLeftRadius: radius.lg,
-    borderTopRightRadius: radius.lg,
-    borderTopWidth: 1,
-    borderColor: colors.border,
+    position: "absolute", left: 0, right: 0, bottom: 0,
+    paddingTop: 8, paddingBottom: space.md,
+    backgroundColor: "rgba(255,255,255,0.98)",
+    borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
+    borderTopWidth: 1, borderColor: colors.border,
+    ...shadow(3),
+  },
+  handle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: colors.borderStrong,
+    alignSelf: "center", marginBottom: space.sm,
   },
   sheetHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "baseline",
-    paddingHorizontal: space.lg,
-    marginBottom: space.sm,
+    flexDirection: "row", justifyContent: "space-between", alignItems: "baseline",
+    paddingHorizontal: space.lg, marginBottom: space.sm,
   },
-  sheetTitle: { fontSize: 16, fontWeight: "700", color: colors.text },
-  sheetCount: { color: colors.muted, fontSize: 13 },
-  empty: { color: colors.muted, paddingHorizontal: space.lg, paddingBottom: space.md },
+  sheetTitle: { ...typography.h3, color: colors.text },
+  sheetSub: { ...typography.small, color: colors.muted },
+
+  empty: { paddingHorizontal: space.lg, paddingVertical: space.lg, alignItems: "center" },
+  emptyEmoji: { fontSize: 38 },
+  emptyTitle: { ...typography.h3, color: colors.text, marginTop: space.sm },
+  emptyBody: { ...typography.body, color: colors.muted, textAlign: "center", marginTop: 4 },
 
   card: {
-    width: 220,
-    backgroundColor: "#fff",
+    width: 240,
+    backgroundColor: colors.card,
     borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 1, borderColor: colors.border,
     overflow: "hidden",
   },
-  cardImg: { width: "100%", height: 110, backgroundColor: "#eee" },
-  cardTitle: { fontWeight: "700", color: colors.text, fontSize: 14 },
-  cardMeta: { color: colors.muted, fontSize: 12 },
+  cardImg: { width: "100%", height: 130, backgroundColor: "#eee" },
+  cardBody: { padding: 10, gap: 4 },
+  cardTitle: { ...typography.bodyStrong, color: colors.text },
+  cardMeta: { ...typography.smallStrong, color: colors.textSoft },
+  cardMetaSoft: { ...typography.small, color: colors.muted },
 });
