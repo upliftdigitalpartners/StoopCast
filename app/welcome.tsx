@@ -19,9 +19,11 @@ import { markWelcomeSkipped } from "@/lib/onboarding";
 import { Button } from "@/components/Button";
 import { Pill } from "@/components/Pill";
 import { buzz } from "@/lib/haptics";
-import { colors, radius, shadow, space, typography } from "@/lib/theme";
+import { radius, shadow, space, typography, useColors, useStyles, type ColorTokens } from "@/lib/theme";
 
 export default function WelcomeScreen() {
+  const colors = useColors();
+  const styles = useStyles(mkStyles);
   const router = useRouter();
   const { session, refreshHome } = useAuth();
   const [homeSet, setHomeSet] = useState(false);
@@ -39,8 +41,7 @@ export default function WelcomeScreen() {
       }
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
       const { error } = await supabase.rpc("set_home_location", {
-        p_lat: loc.coords.latitude,
-        p_lng: loc.coords.longitude,
+        p_lat: loc.coords.latitude, p_lng: loc.coords.longitude,
       });
       if (error) throw error;
       buzz.success();
@@ -94,26 +95,16 @@ export default function WelcomeScreen() {
           </Text>
         </View>
 
-        <Step
-          n={1}
-          title="Set your neighborhood"
+        <Step n={1} title="Set your neighborhood"
           body="We'll only ping you about stoops within 1.5km of this point. No location, no spam."
-          done={homeSet}
-          ctaLabel={homeSet ? "Saved" : "Use current location"}
-          ctaIcon="📍"
-          onPress={setHome}
-          loading={busyHome}
+          done={homeSet} ctaLabel={homeSet ? "Saved" : "Use current location"} ctaIcon="📍"
+          onPress={setHome} loading={busyHome} colors={colors}
         />
 
-        <Step
-          n={2}
-          title="Turn on notifications"
+        <Step n={2} title="Turn on notifications"
           body="The 15-minute alert window only matters if your phone buzzes. Promise we won't overdo it."
-          done={pushSet}
-          ctaLabel={pushSet ? "Enabled" : "Enable push"}
-          ctaIcon="🔔"
-          onPress={enablePush}
-          loading={busyPush}
+          done={pushSet} ctaLabel={pushSet ? "Enabled" : "Enable push"} ctaIcon="🔔"
+          onPress={enablePush} loading={busyPush} colors={colors}
         />
 
         <View style={styles.actions}>
@@ -132,69 +123,50 @@ export default function WelcomeScreen() {
 }
 
 function Step({
-  n, title, body, done, ctaLabel, ctaIcon, onPress, loading,
+  n, title, body, done, ctaLabel, ctaIcon, onPress, loading, colors,
 }: {
-  n: number;
-  title: string;
-  body: string;
-  done: boolean;
-  ctaLabel: string;
-  ctaIcon: string;
-  onPress: () => void;
-  loading?: boolean;
+  n: number; title: string; body: string; done: boolean;
+  ctaLabel: string; ctaIcon: string; onPress: () => void; loading?: boolean;
+  colors: ColorTokens;
 }) {
   return (
-    <View style={[styles.card, done && styles.cardDone, shadow(1)]}>
-      <View style={styles.cardHead}>
-        <View style={[styles.numDot, done && styles.numDotDone]}>
-          <Text style={[styles.numText, done && { color: "#fff" }]}>{done ? "✓" : n}</Text>
+    <View style={[
+      {
+        backgroundColor: done ? colors.liveSurface : colors.bgElevated,
+        borderRadius: radius.md, padding: space.md,
+        borderWidth: 1, borderColor: done ? colors.success : colors.border, gap: space.sm,
+      },
+      shadow(1),
+    ]}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
+        <View style={{
+          width: 28, height: 28, borderRadius: 14,
+          borderWidth: 1.5,
+          borderColor: done ? colors.success : colors.borderStrong,
+          backgroundColor: done ? colors.success : colors.bg,
+          alignItems: "center", justifyContent: "center",
+        }}>
+          <Text style={{ fontWeight: "800", color: done ? "#fff" : colors.muted, fontSize: 13 }}>{done ? "✓" : n}</Text>
         </View>
-        <Text style={styles.cardTitle}>{title}</Text>
+        <Text style={{ ...typography.h3, color: colors.text, flex: 1 }}>{title}</Text>
         {done ? <Pill label="done" tone="live" /> : null}
       </View>
-      <Text style={styles.cardBody}>{body}</Text>
-      <Button
-        label={ctaLabel}
-        icon={ctaIcon}
-        variant={done ? "secondary" : "primary"}
-        onPress={onPress}
-        loading={loading}
-        disabled={done}
-      />
+      <Text style={{ ...typography.body, color: colors.muted, lineHeight: 20 }}>{body}</Text>
+      <Button label={ctaLabel} icon={ctaIcon} variant={done ? "secondary" : "primary"} onPress={onPress} loading={loading} disabled={done} />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg },
+const mkStyles = (c: ColorTokens) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.bg },
   scroll: { padding: space.lg, gap: space.md, paddingBottom: space.xxl },
 
   brand: { alignItems: "center", gap: 4, marginBottom: space.sm },
   logo: { width: 72, height: 72, borderRadius: 18, marginBottom: space.sm },
-  h1: { ...typography.h1, color: colors.text, textAlign: "center" },
-  tagline: { ...typography.body, color: colors.muted, textAlign: "center", marginTop: 4 },
-
-  card: {
-    backgroundColor: colors.bgElevated,
-    borderRadius: radius.md,
-    padding: space.md,
-    borderWidth: 1, borderColor: colors.border,
-    gap: space.sm,
-  },
-  cardDone: { borderColor: colors.success, backgroundColor: "#f3faf6" },
-  cardHead: { flexDirection: "row", alignItems: "center", gap: space.sm },
-  numDot: {
-    width: 28, height: 28, borderRadius: 14,
-    borderWidth: 1.5, borderColor: colors.borderStrong,
-    alignItems: "center", justifyContent: "center",
-    backgroundColor: colors.bg,
-  },
-  numDotDone: { backgroundColor: colors.success, borderColor: colors.success },
-  numText: { fontWeight: "800", color: colors.muted, fontSize: 13 },
-  cardTitle: { ...typography.h3, color: colors.text, flex: 1 },
-  cardBody: { ...typography.body, color: colors.muted, lineHeight: 20 },
+  h1: { ...typography.h1, color: c.text, textAlign: "center" },
+  tagline: { ...typography.body, color: c.muted, textAlign: "center", marginTop: 4 },
 
   actions: { gap: space.sm, marginTop: space.md },
   skip: { padding: space.sm, alignItems: "center" },
-  skipText: { ...typography.smallStrong, color: colors.muted },
+  skipText: { ...typography.smallStrong, color: c.muted },
 });

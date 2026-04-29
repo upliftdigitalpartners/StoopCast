@@ -18,7 +18,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { registerForPushAsync } from "@/lib/notifications";
-import { colors, radius, shadow, space, typography } from "@/lib/theme";
+import { radius, shadow, space, typography, useColors, useStyles, type ColorTokens } from "@/lib/theme";
 import { minutesLeft, timeAgo } from "@/lib/time";
 import { formatDistance } from "@/lib/distance";
 import { CATEGORIES, categoryOf, type CategoryId } from "@/lib/categories";
@@ -32,6 +32,8 @@ import type { NearbyPost } from "@/lib/types";
 const DEFAULT_RADIUS_M = 2000;
 
 export default function MapScreen() {
+  const colors = useColors();
+  const styles = useStyles(mkStyles);
   const router = useRouter();
   const { session } = useAuth();
   const mapRef = useRef<MapView>(null);
@@ -67,9 +69,7 @@ export default function MapScreen() {
   }, [session?.user?.id]);
 
   const loadPosts = useCallback(async (lat: number, lng: number) => {
-    const { data, error } = await supabase.rpc("nearby_posts", {
-      lat, lng, radius_m: DEFAULT_RADIUS_M,
-    });
+    const { data, error } = await supabase.rpc("nearby_posts", { lat, lng, radius_m: DEFAULT_RADIUS_M });
     if (!error && data) setPosts(data as NearbyPost[]);
     setLoading(false);
   }, []);
@@ -181,24 +181,14 @@ export default function MapScreen() {
       </SafeAreaView>
 
       <View style={styles.filterRow} pointerEvents="box-none">
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterContent}
-        >
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterContent}>
           {filters.size > 0 ? (
             <Pressable onPress={() => { buzz.light(); setFilters(new Set()); }} style={styles.clearChip}>
               <Text style={styles.clearChipText}>✕ All</Text>
             </Pressable>
           ) : null}
           {CATEGORIES.map((c) => (
-            <CategoryChip
-              key={c.id}
-              id={c.id}
-              size="sm"
-              selected={filters.has(c.id)}
-              onPress={() => toggleFilter(c.id)}
-            />
+            <CategoryChip key={c.id} id={c.id} size="sm" selected={filters.has(c.id)} onPress={() => toggleFilter(c.id)} />
           ))}
         </ScrollView>
       </View>
@@ -223,19 +213,9 @@ export default function MapScreen() {
                 : "Be the first today — snap a photo of free stuff on a stoop nearby."}
             </Text>
             {filters.size > 0 ? (
-              <Button
-                label="Clear filter"
-                variant="secondary"
-                onPress={() => setFilters(new Set())}
-                style={{ marginTop: space.md }}
-              />
+              <Button label="Clear filter" variant="secondary" onPress={() => setFilters(new Set())} style={{ marginTop: space.md }} />
             ) : (
-              <Button
-                label="Post a find"
-                icon="📷"
-                onPress={() => router.push("/(tabs)/post")}
-                style={{ marginTop: space.md }}
-              />
+              <Button label="Post a find" icon="📷" onPress={() => router.push("/(tabs)/post")} style={{ marginTop: space.md }} />
             )}
           </View>
         ) : (
@@ -245,18 +225,13 @@ export default function MapScreen() {
             showsHorizontalScrollIndicator={false}
             keyExtractor={(p) => p.id}
             contentContainerStyle={{ paddingHorizontal: space.lg, gap: space.md }}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
-            }
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
             renderItem={({ item }) => {
               const left = minutesLeft(item.expires_at);
               const tone = left <= 5 ? "warn" : "live";
               const cat = categoryOf(item.category);
               return (
-                <Pressable
-                  style={[styles.card, shadow(1)]}
-                  onPress={() => { buzz.light(); router.push(`/post/${item.id}`); }}
-                >
+                <Pressable style={[styles.card, shadow(1)]} onPress={() => { buzz.light(); router.push(`/post/${item.id}`); }}>
                   <Image source={{ uri: item.photo_url }} style={styles.cardImg} />
                   <View style={styles.catBadge}>
                     <Text style={styles.catBadgeText}>{cat.emoji} {cat.label}</Text>
@@ -279,85 +254,81 @@ export default function MapScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
+const mkStyles = (c: ColorTokens) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: c.bg },
   center: {
     flex: 1, alignItems: "center", justifyContent: "center",
-    padding: space.xl, backgroundColor: colors.bg, gap: space.md,
+    padding: space.xl, backgroundColor: c.bg, gap: space.md,
   },
-  loading: { color: colors.muted },
-  deniedTitle: { ...typography.h2, color: colors.text },
-  deniedBody: { ...typography.body, color: colors.muted, textAlign: "center" },
+  loading: { color: c.muted },
+  deniedTitle: { ...typography.h2, color: c.text },
+  deniedBody: { ...typography.body, color: c.muted, textAlign: "center" },
 
   topBar: {
-    position: "absolute",
-    top: 0, left: 0, right: 0,
+    position: "absolute", top: 0, left: 0, right: 0,
     paddingHorizontal: space.lg, paddingTop: space.sm,
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
   },
   brandPill: {
     flexDirection: "row", alignItems: "center", gap: space.sm,
-    backgroundColor: colors.bgElevated,
+    backgroundColor: c.bgElevated,
     borderRadius: radius.pill,
     paddingHorizontal: 14, paddingVertical: 8,
-    borderWidth: 1, borderColor: colors.border,
+    borderWidth: 1, borderColor: c.border,
   },
-  livePulse: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.success },
-  brandText: { ...typography.bodyStrong, color: colors.text },
-  brandCount: { ...typography.smallStrong, color: colors.muted },
+  livePulse: { width: 8, height: 8, borderRadius: 4, backgroundColor: c.success },
+  brandText: { ...typography.bodyStrong, color: c.text },
+  brandCount: { ...typography.smallStrong, color: c.muted },
   fab: {
     width: 44, height: 44, borderRadius: 22,
-    backgroundColor: colors.bgElevated,
+    backgroundColor: c.bgElevated,
     alignItems: "center", justifyContent: "center",
-    borderWidth: 1, borderColor: colors.border,
+    borderWidth: 1, borderColor: c.border,
   },
 
-  filterRow: {
-    position: "absolute", left: 0, right: 0,
-    top: 70,
-  },
+  filterRow: { position: "absolute", left: 0, right: 0, top: 70 },
   filterContent: { paddingHorizontal: space.lg, gap: 6, paddingVertical: 4 },
   clearChip: {
     paddingHorizontal: 12, paddingVertical: 5,
     borderRadius: radius.pill,
-    backgroundColor: colors.text,
+    backgroundColor: c.text,
     alignItems: "center", justifyContent: "center",
   },
-  clearChipText: { color: "#fff", fontWeight: "700", fontSize: 12 },
+  clearChipText: { color: c.bg, fontWeight: "700", fontSize: 12 },
 
   sheet: {
     position: "absolute", left: 0, right: 0, bottom: 0,
     paddingTop: 8, paddingBottom: space.md,
-    backgroundColor: "rgba(255,255,255,0.98)",
+    backgroundColor: c.bgElevated,
     borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
-    borderTopWidth: 1, borderColor: colors.border,
+    borderTopWidth: 1, borderColor: c.border,
     ...shadow(3),
   },
   handle: {
     width: 40, height: 4, borderRadius: 2,
-    backgroundColor: colors.borderStrong,
+    backgroundColor: c.borderStrong,
     alignSelf: "center", marginBottom: space.sm,
   },
   sheetHeader: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "baseline",
     paddingHorizontal: space.lg, marginBottom: space.sm,
   },
-  sheetTitle: { ...typography.h3, color: colors.text },
-  sheetSub: { ...typography.small, color: colors.muted },
+  sheetTitle: { ...typography.h3, color: c.text },
+  sheetSub: { ...typography.small, color: c.muted },
 
   empty: { paddingHorizontal: space.lg, paddingVertical: space.lg, alignItems: "center" },
   emptyEmoji: { fontSize: 38 },
-  emptyTitle: { ...typography.h3, color: colors.text, marginTop: space.sm },
-  emptyBody: { ...typography.body, color: colors.muted, textAlign: "center", marginTop: 4 },
+  emptyTitle: { ...typography.h3, color: c.text, marginTop: space.sm },
+  emptyBody: { ...typography.body, color: c.muted, textAlign: "center", marginTop: 4 },
 
   card: {
     width: 240,
-    backgroundColor: colors.card,
+    backgroundColor: c.card,
     borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border,
+    borderWidth: 1, borderColor: c.border,
     overflow: "hidden",
   },
-  cardImg: { width: "100%", height: 130, backgroundColor: "#eee" },
+  cardImg: { width: "100%", height: 130, backgroundColor: c.bg },
   catBadge: {
     position: "absolute", top: 8, left: 8,
     backgroundColor: "rgba(20,20,20,0.78)",
@@ -365,7 +336,7 @@ const styles = StyleSheet.create({
   },
   catBadgeText: { color: "#fff", fontWeight: "700", fontSize: 11 },
   cardBody: { padding: 10, gap: 4 },
-  cardTitle: { ...typography.bodyStrong, color: colors.text },
-  cardMeta: { ...typography.smallStrong, color: colors.textSoft },
-  cardMetaSoft: { ...typography.small, color: colors.muted },
+  cardTitle: { ...typography.bodyStrong, color: c.text },
+  cardMeta: { ...typography.smallStrong, color: c.textSoft },
+  cardMetaSoft: { ...typography.small, color: c.muted },
 });

@@ -76,7 +76,24 @@ Then in the Supabase dashboard:
 - Table: `posts`, Events: `INSERT`
 - Type: **Supabase Edge Functions**, choose `notify-nearby`
 
-### 6. (Optional) Schedule expiry sweep
+### 6. (Optional) Image moderation with Sightengine
+
+If you want auto-moderation of stoop photos (nudity, weapons, drugs, offensive symbols):
+
+1. Sign up at <https://sightengine.com> (free tier: 500 ops/mo).
+2. Set the secrets on your Supabase project:
+   ```bash
+   supabase secrets set SIGHTENGINE_USER=your_api_user SIGHTENGINE_SECRET=your_api_secret
+   ```
+3. Deploy the moderation function:
+   ```bash
+   supabase functions deploy moderate-post --no-verify-jwt
+   ```
+4. In the Supabase dashboard add a second Database Webhook: table `posts`, event `INSERT`, type Edge Functions, function `moderate-post`. (Coexists with `notify-nearby` — both fire on insert.)
+
+When a flagged photo is detected, the post is soft-deleted (status='gone'), the offending objects are removed from storage, and an entry is recorded in the `reports` table.
+
+### 7. (Optional) Schedule expiry sweep
 
 In **Database → Cron**, schedule `select public.expire_old_posts();` every minute so expired posts disappear from the feed.
 

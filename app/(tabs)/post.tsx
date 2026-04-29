@@ -24,12 +24,14 @@ import { Pill } from "@/components/Pill";
 import { CategoryChip } from "@/components/CategoryChip";
 import { CATEGORIES, type CategoryId } from "@/lib/categories";
 import { buzz } from "@/lib/haptics";
-import { colors, radius, shadow, space, typography } from "@/lib/theme";
+import { radius, shadow, space, typography, useColors, useStyles, type ColorTokens } from "@/lib/theme";
 
 type LocalPhoto = { uri: string; base64: string; mime: string };
 const MAX_PHOTOS = 4;
 
 export default function PostScreen() {
+  const colors = useColors();
+  const styles = useStyles(mkStyles);
   const router = useRouter();
   const { session } = useAuth();
   const [photos, setPhotos] = useState<LocalPhoto[]>([]);
@@ -144,11 +146,11 @@ export default function PostScreen() {
           </View>
 
           <View style={styles.steps}>
-            <Step n={1} label="Photo" done={stepDone(1)} />
+            <Step n={1} label="Photo" done={stepDone(1)} colors={colors} />
             <View style={styles.stepLine} />
-            <Step n={2} label="Pin" done={stepDone(2)} />
+            <Step n={2} label="Pin" done={stepDone(2)} colors={colors} />
             <View style={styles.stepLine} />
-            <Step n={3} label="Details" done={stepDone(3)} />
+            <Step n={3} label="Details" done={stepDone(3)} colors={colors} />
           </View>
 
           {photos.length > 0 ? (
@@ -216,33 +218,18 @@ export default function PostScreen() {
             <Text style={styles.fieldLabel}>Category</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 2 }}>
               {CATEGORIES.map((c) => (
-                <CategoryChip
-                  key={c.id}
-                  id={c.id}
-                  selected={category === c.id}
-                  onPress={() => { setCategory(c.id); buzz.light(); }}
-                />
+                <CategoryChip key={c.id} id={c.id} selected={category === c.id} onPress={() => { setCategory(c.id); buzz.light(); }} />
               ))}
             </ScrollView>
 
             <Text style={styles.fieldLabel}>Title</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Yellow lamp"
-              value={title}
-              onChangeText={setTitle}
-              maxLength={80}
-              placeholderTextColor={colors.muted}
-            />
+            <TextInput style={styles.input} placeholder="Yellow lamp" value={title} onChangeText={setTitle} maxLength={80} placeholderTextColor={colors.muted} />
             <Text style={styles.fieldLabel}>Description (optional)</Text>
             <TextInput
               style={[styles.input, styles.textarea]}
               placeholder="Condition, brand, anything to know"
-              value={description}
-              onChangeText={setDescription}
-              multiline
-              maxLength={500}
-              placeholderTextColor={colors.muted}
+              value={description} onChangeText={setDescription}
+              multiline maxLength={500} placeholderTextColor={colors.muted}
             />
           </View>
 
@@ -259,42 +246,38 @@ export default function PostScreen() {
   );
 }
 
-function Step({ n, label, done }: { n: number; label: string; done: boolean }) {
+function Step({ n, label, done, colors }: { n: number; label: string; done: boolean; colors: ColorTokens }) {
   return (
-    <View style={styles.stepWrap}>
-      <View style={[styles.stepDot, done && styles.stepDotDone]}>
-        <Text style={[styles.stepDotText, done && { color: "#fff" }]}>{done ? "✓" : n}</Text>
+    <View style={{ alignItems: "center", gap: 4, width: 70 }}>
+      <View style={{
+        width: 30, height: 30, borderRadius: 15,
+        borderWidth: 1.5,
+        borderColor: done ? colors.success : colors.borderStrong,
+        backgroundColor: done ? colors.success : colors.bgElevated,
+        alignItems: "center", justifyContent: "center",
+      }}>
+        <Text style={{ fontWeight: "700", color: done ? "#fff" : colors.muted, fontSize: 13 }}>{done ? "✓" : n}</Text>
       </View>
-      <Text style={[styles.stepLabel, done && { color: colors.text }]}>{label}</Text>
+      <Text style={{ ...typography.tiny, color: done ? colors.text : colors.muted, textTransform: "none" }}>{label}</Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg },
+const mkStyles = (c: ColorTokens) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.bg },
   scroll: { padding: space.lg, gap: space.md, paddingBottom: space.xxl },
   header: { gap: 4, marginBottom: space.xs },
-  h1: { ...typography.h1, color: colors.text },
-  sub: { ...typography.body, color: colors.muted },
+  h1: { ...typography.h1, color: c.text },
+  sub: { ...typography.body, color: c.muted },
 
   steps: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: space.sm },
-  stepWrap: { alignItems: "center", gap: 4, width: 70 },
-  stepDot: {
-    width: 30, height: 30, borderRadius: 15,
-    borderWidth: 1.5, borderColor: colors.borderStrong,
-    alignItems: "center", justifyContent: "center",
-    backgroundColor: colors.bgElevated,
-  },
-  stepDotDone: { backgroundColor: colors.success, borderColor: colors.success },
-  stepDotText: { fontWeight: "700", color: colors.muted, fontSize: 13 },
-  stepLabel: { ...typography.tiny, color: colors.muted, textTransform: "none" },
-  stepLine: { flex: 1, height: 1.5, backgroundColor: colors.border, marginHorizontal: 4, marginBottom: 16 },
+  stepLine: { flex: 1, height: 1.5, backgroundColor: c.border, marginHorizontal: 4, marginBottom: 16 },
 
-  thumbWrap: { width: 110, height: 110, borderRadius: radius.md, overflow: "hidden", backgroundColor: "#eee" },
+  thumbWrap: { width: 110, height: 110, borderRadius: radius.md, overflow: "hidden", backgroundColor: c.bg },
   thumb: { width: "100%", height: "100%" },
   primaryTag: {
     position: "absolute", top: 6, left: 6,
-    backgroundColor: colors.primary, paddingHorizontal: 8, paddingVertical: 2, borderRadius: radius.pill,
+    backgroundColor: c.primary, paddingHorizontal: 8, paddingVertical: 2, borderRadius: radius.pill,
   },
   primaryTagText: { color: "#fff", fontSize: 10, fontWeight: "800", textTransform: "uppercase" },
   removeBtn: {
@@ -306,42 +289,42 @@ const styles = StyleSheet.create({
   removeText: { color: "#fff", fontWeight: "700", fontSize: 12 },
   addThumb: {
     width: 110, height: 110, borderRadius: radius.md,
-    borderWidth: 2, borderStyle: "dashed", borderColor: colors.border,
+    borderWidth: 2, borderStyle: "dashed", borderColor: c.border,
     alignItems: "center", justifyContent: "center",
   },
-  photoHint: { ...typography.small, color: colors.muted },
+  photoHint: { ...typography.small, color: c.muted },
 
   photoChoiceWrap: { gap: space.sm },
   photoBig: {
-    backgroundColor: colors.bgElevated,
+    backgroundColor: c.bgElevated,
     borderRadius: radius.lg, padding: space.xl,
-    borderWidth: 2, borderColor: colors.border, borderStyle: "dashed",
+    borderWidth: 2, borderColor: c.border, borderStyle: "dashed",
     alignItems: "center", gap: 4,
   },
   photoBigEmoji: { fontSize: 38 },
-  photoBigText: { ...typography.h3, color: colors.text },
-  photoBigSub: { ...typography.small, color: colors.muted },
+  photoBigText: { ...typography.h3, color: c.text },
+  photoBigSub: { ...typography.small, color: c.muted },
   photoSmall: { padding: space.sm, alignItems: "center" },
-  photoSmallText: { ...typography.smallStrong, color: colors.primary },
+  photoSmallText: { ...typography.smallStrong, color: c.primary },
 
   locCard: {
     flexDirection: "row", alignItems: "center", gap: space.md,
-    backgroundColor: colors.bgElevated,
+    backgroundColor: c.bgElevated,
     borderRadius: radius.md, padding: space.md,
-    borderWidth: 1, borderColor: colors.border,
+    borderWidth: 1, borderColor: c.border,
   },
-  locCardSet: { borderColor: colors.success, backgroundColor: "#f3faf6" },
+  locCardSet: { borderColor: c.success, backgroundColor: c.liveSurface },
   locTopRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 2 },
-  locLabel: { ...typography.smallStrong, color: colors.muted, textTransform: "uppercase", letterSpacing: 0.4 },
-  locValue: { ...typography.bodyStrong, color: colors.text },
+  locLabel: { ...typography.smallStrong, color: c.muted, textTransform: "uppercase", letterSpacing: 0.4 },
+  locValue: { ...typography.bodyStrong, color: c.text },
   locArrow: { fontSize: 22 },
 
   fields: { gap: space.sm },
-  fieldLabel: { ...typography.smallStrong, color: colors.muted, textTransform: "uppercase", letterSpacing: 0.4, marginTop: 4 },
+  fieldLabel: { ...typography.smallStrong, color: c.muted, textTransform: "uppercase", letterSpacing: 0.4, marginTop: 4 },
   input: {
-    borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
-    padding: space.md, backgroundColor: colors.bgElevated,
-    color: colors.text, fontSize: 16,
+    borderWidth: 1, borderColor: c.border, borderRadius: radius.md,
+    padding: space.md, backgroundColor: c.inputBg,
+    color: c.text, fontSize: 16,
   },
   textarea: { height: 100, textAlignVertical: "top" },
 });

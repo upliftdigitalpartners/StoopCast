@@ -8,7 +8,6 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
-import { colors } from "@/lib/theme";
 
 export function PhotoCarousel({ uris }: { uris: string[] }) {
   const [index, setIndex] = useState(0);
@@ -46,7 +45,7 @@ export function PhotoCarousel({ uris }: { uris: string[] }) {
 }
 
 const styles = StyleSheet.create({
-  single: { aspectRatio: 4 / 3, backgroundColor: "#eee" },
+  single: { aspectRatio: 4 / 3, backgroundColor: "#000" },
   dots: {
     position: "absolute", bottom: 12, left: 0, right: 0,
     flexDirection: "row", justifyContent: "center", gap: 6,

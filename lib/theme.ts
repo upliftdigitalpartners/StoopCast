@@ -1,6 +1,7 @@
-import { Platform, type ViewStyle } from "react-native";
+import { useMemo } from "react";
+import { Platform, useColorScheme, type ViewStyle } from "react-native";
 
-export const colors = {
+export const lightColors = {
   bg: "#f7f5f0",
   bgElevated: "#ffffff",
   card: "#ffffff",
@@ -19,7 +20,45 @@ export const colors = {
   pinClaimed: "#9a9a9a",
   pinExpiring: "#d98e1c",
   overlay: "rgba(20,20,20,0.55)",
+  // Tinted surface backgrounds used by status banners.
+  liveSurface: "#e8f5ee",
+  liveBorder: "#bfe5cf",
+  warnSurface: "#fff5e6",
+  warnBorder: "#f4d9aa",
+  primarySurface: "#fde8e3",
+  primaryBorder: "#f5c5b8",
+  inputBg: "#f7f5f0",
 };
+
+export const darkColors: typeof lightColors = {
+  bg: "#0f1110",
+  bgElevated: "#1a1c1b",
+  card: "#1a1c1b",
+  text: "#f4f1ea",
+  textSoft: "#cfcabf",
+  muted: "#8a857c",
+  border: "#2a2c2b",
+  borderStrong: "#3a3c3b",
+  primary: "#ff6a4a",
+  primaryDark: "#e84d2c",
+  accent: "#33b5b5",
+  success: "#3ba368",
+  warn: "#e8a634",
+  danger: "#e05a4d",
+  pin: "#ff6a4a",
+  pinClaimed: "#5a5a5a",
+  pinExpiring: "#e8a634",
+  overlay: "rgba(0,0,0,0.65)",
+  liveSurface: "#173024",
+  liveBorder: "#2c5942",
+  warnSurface: "#332615",
+  warnBorder: "#5a4628",
+  primarySurface: "#3a1d15",
+  primaryBorder: "#5a2d20",
+  inputBg: "#15171a",
+};
+
+export type ColorTokens = typeof lightColors;
 
 export const radius = { sm: 8, md: 14, lg: 20, xl: 28, pill: 999 };
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
@@ -35,6 +74,16 @@ export const typography = {
   tiny: { fontSize: 11, fontWeight: "600" as const, letterSpacing: 0.4 },
 };
 
+export function useColors(): ColorTokens {
+  const scheme = useColorScheme();
+  return scheme === "dark" ? darkColors : lightColors;
+}
+
+export function useStyles<T>(maker: (c: ColorTokens) => T): T {
+  const colors = useColors();
+  return useMemo(() => maker(colors), [colors]);
+}
+
 export function shadow(level: 1 | 2 | 3 = 1): ViewStyle {
   if (Platform.OS === "android") {
     return { elevation: level === 1 ? 2 : level === 2 ? 5 : 9 };
@@ -47,8 +96,8 @@ export function shadow(level: 1 | 2 | 3 = 1): ViewStyle {
   return { shadowColor: "#000", ...map[level] };
 }
 
-export function pinColorFor(status: string, minsLeft: number): string {
-  if (status !== "live") return colors.pinClaimed;
-  if (minsLeft <= 5) return colors.pinExpiring;
-  return colors.pin;
+export function pinColorFor(c: ColorTokens, status: string, minsLeft: number): string {
+  if (status !== "live") return c.pinClaimed;
+  if (minsLeft <= 5) return c.pinExpiring;
+  return c.pin;
 }

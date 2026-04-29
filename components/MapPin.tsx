@@ -1,13 +1,13 @@
 import { StyleSheet, Text, View } from "react-native";
-import { colors, shadow } from "@/lib/theme";
+import { shadow, useColors } from "@/lib/theme";
 
 export function MapPin({
-  minutesLeft,
-  status,
+  minutesLeft, status,
 }: {
   minutesLeft: number;
   status: string;
 }) {
+  const colors = useColors();
   const isLive = status === "live" && minutesLeft > 0;
   const isExpiring = isLive && minutesLeft <= 5;
   const bg = !isLive ? colors.pinClaimed : isExpiring ? colors.pinExpiring : colors.pin;

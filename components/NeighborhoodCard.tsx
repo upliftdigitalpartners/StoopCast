@@ -3,15 +3,16 @@ import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import * as Location from "expo-location";
 import { supabase } from "@/lib/supabase";
 import { Pill } from "@/components/Pill";
-import { colors, radius, shadow, space, typography } from "@/lib/theme";
+import { radius, shadow, space, typography, useColors, useStyles, type ColorTokens } from "@/lib/theme";
 
 export function NeighborhoodCard({
-  isSet,
-  onChanged,
+  isSet, onChanged,
 }: {
   isSet: boolean;
   onChanged: () => void;
 }) {
+  const colors = useColors();
+  const styles = useStyles(mkStyles);
   const [home, setHome] = useState<{ lat: number; lng: number } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -33,8 +34,7 @@ export function NeighborhoodCard({
       }
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
       const { error } = await supabase.rpc("set_home_location", {
-        p_lat: loc.coords.latitude,
-        p_lng: loc.coords.longitude,
+        p_lat: loc.coords.latitude, p_lng: loc.coords.longitude,
       });
       if (error) throw error;
       onChanged();
@@ -46,7 +46,11 @@ export function NeighborhoodCard({
   };
 
   return (
-    <View style={[styles.card, isSet ? styles.cardSet : styles.cardUnset, shadow(1)]}>
+    <View style={[
+      styles.card,
+      isSet ? { borderColor: colors.success } : { borderColor: colors.border },
+      shadow(1),
+    ]}>
       <View style={styles.row}>
         <Text style={styles.emoji}>🏠</Text>
         <View style={{ flex: 1 }}>
@@ -79,28 +83,26 @@ export function NeighborhoodCard({
   );
 }
 
-const styles = StyleSheet.create({
+const mkStyles = (c: ColorTokens) => StyleSheet.create({
   card: {
-    backgroundColor: colors.bgElevated,
+    backgroundColor: c.bgElevated,
     borderRadius: radius.md,
     padding: space.md,
     borderWidth: 1,
     gap: space.sm,
   },
-  cardSet: { borderColor: colors.success },
-  cardUnset: { borderColor: colors.border },
   row: { flexDirection: "row", gap: space.md, alignItems: "flex-start" },
   emoji: { fontSize: 28 },
   titleRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 },
-  title: { ...typography.bodyStrong, color: colors.text },
-  body: { ...typography.small, color: colors.muted, lineHeight: 18 },
-  coords: { ...typography.smallStrong, color: colors.text, marginTop: 6 },
+  title: { ...typography.bodyStrong, color: c.text },
+  body: { ...typography.small, color: c.muted, lineHeight: 18 },
+  coords: { ...typography.smallStrong, color: c.text, marginTop: 6 },
   cta: {
     alignSelf: "flex-start",
     paddingHorizontal: 14, paddingVertical: 8,
-    backgroundColor: colors.bg,
+    backgroundColor: c.bg,
     borderRadius: radius.pill,
-    borderWidth: 1, borderColor: colors.border,
+    borderWidth: 1, borderColor: c.border,
   },
-  ctaText: { ...typography.smallStrong, color: colors.primary },
+  ctaText: { ...typography.smallStrong, color: c.primary },
 });

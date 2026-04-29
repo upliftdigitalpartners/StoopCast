@@ -18,11 +18,13 @@ import { Pill } from "@/components/Pill";
 import { NeighborhoodCard } from "@/components/NeighborhoodCard";
 import { AchievementBadge } from "@/components/AchievementBadge";
 import { computeAchievements } from "@/lib/achievements";
-import { colors, radius, shadow, space, typography } from "@/lib/theme";
+import { radius, shadow, space, typography, useColors, useStyles, type ColorTokens } from "@/lib/theme";
 import { timeAgo } from "@/lib/time";
 import type { Post, Profile, Stats } from "@/lib/types";
 
 export default function ProfileScreen() {
+  const colors = useColors();
+  const styles = useStyles(mkStyles);
   const router = useRouter();
   const { session, signOut } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -75,15 +77,13 @@ export default function ProfileScreen() {
             </View>
 
             <View style={styles.statsRow}>
-              <Stat label="Karma" value={profile?.karma ?? 0} accent />
-              <Stat label="Posts" value={stats?.posts ?? 0} />
-              <Stat label="Claimed" value={stats?.claims ?? 0} />
+              <Stat label="Karma" value={profile?.karma ?? 0} accent colors={colors} />
+              <Stat label="Posts" value={stats?.posts ?? 0} colors={colors} />
+              <Stat label="Claimed" value={stats?.claims ?? 0} colors={colors} />
             </View>
 
             {stats && stats.weekly_karma > 0 ? (
-              <Text style={styles.weekly}>
-                ⭐ +{stats.weekly_karma} karma this week
-              </Text>
+              <Text style={styles.weekly}>⭐ +{stats.weekly_karma} karma this week</Text>
             ) : null}
 
             <NeighborhoodCard isSet={!!profile?.home_set} onChanged={load} />
@@ -109,12 +109,7 @@ export default function ProfileScreen() {
             <Text style={styles.emptyEmoji}>🪑</Text>
             <Text style={styles.emptyTitle}>No posts yet</Text>
             <Text style={styles.emptyBody}>Spot something free on a stoop? Snap it and earn karma.</Text>
-            <Button
-              label="Post your first find"
-              icon="📷"
-              onPress={() => router.push("/(tabs)/post")}
-              style={{ marginTop: space.md }}
-            />
+            <Button label="Post your first find" icon="📷" onPress={() => router.push("/(tabs)/post")} style={{ marginTop: space.md }} />
           </View>
         }
         renderItem={({ item }) => (
@@ -146,72 +141,71 @@ export default function ProfileScreen() {
   );
 }
 
-function Stat({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
+function Stat({ label, value, accent, colors }: { label: string; value: number; accent?: boolean; colors: ColorTokens }) {
   return (
-    <View style={[styles.stat, accent && styles.statAccent, shadow(1)]}>
-      <Text style={[styles.statValue, accent && { color: colors.primary }]}>
+    <View style={[
+      {
+        flex: 1, backgroundColor: accent ? colors.bgElevated : colors.bgElevated,
+        paddingVertical: space.md, paddingHorizontal: space.sm,
+        borderRadius: radius.md, alignItems: "center",
+        borderWidth: 1, borderColor: accent ? colors.primary : colors.border, gap: 2,
+      },
+      shadow(1),
+    ]}>
+      <Text style={{ fontSize: 22, fontWeight: "800", color: accent ? colors.primary : colors.text }}>
         {accent ? "⭐ " : ""}{value}
       </Text>
-      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={{ ...typography.tiny, color: colors.muted, textTransform: "uppercase" }}>{label}</Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg },
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
+const mkStyles = (c: ColorTokens) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.bg },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: c.bg },
 
   header: { alignItems: "center", gap: space.xs },
   avatar: {
     width: 72, height: 72, borderRadius: 36,
-    backgroundColor: colors.primary,
+    backgroundColor: c.primary,
     alignItems: "center", justifyContent: "center",
     marginBottom: space.sm,
   },
   avatarText: { color: "#fff", fontSize: 26, fontWeight: "800" },
-  handle: { ...typography.h2, color: colors.text },
-  email: { ...typography.small, color: colors.muted },
+  handle: { ...typography.h2, color: c.text },
+  email: { ...typography.small, color: c.muted },
   streakPill: {
     marginTop: space.sm,
     paddingHorizontal: 12, paddingVertical: 6,
-    backgroundColor: "#fff5e6",
+    backgroundColor: c.warnSurface,
     borderRadius: radius.pill,
-    borderWidth: 1, borderColor: "#f4d9aa",
+    borderWidth: 1, borderColor: c.warnBorder,
   },
-  streakText: { color: colors.warn, fontWeight: "800", fontSize: 13 },
+  streakText: { color: c.warn, fontWeight: "800", fontSize: 13 },
 
   statsRow: { flexDirection: "row", gap: space.sm },
-  stat: {
-    flex: 1, backgroundColor: colors.bgElevated,
-    paddingVertical: space.md, paddingHorizontal: space.sm,
-    borderRadius: radius.md, alignItems: "center",
-    borderWidth: 1, borderColor: colors.border, gap: 2,
-  },
-  statAccent: { borderColor: colors.primary, backgroundColor: "#fff" },
-  statValue: { fontSize: 22, fontWeight: "800", color: colors.text },
-  statLabel: { ...typography.tiny, color: colors.muted, textTransform: "uppercase" },
 
-  weekly: { ...typography.smallStrong, color: colors.primary, textAlign: "center", marginTop: -8 },
+  weekly: { ...typography.smallStrong, color: c.primary, textAlign: "center", marginTop: -8 },
 
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  sectionTitle: { ...typography.h3, color: colors.text },
-  sectionMeta: { ...typography.smallStrong, color: colors.muted },
+  sectionTitle: { ...typography.h3, color: c.text },
+  sectionMeta: { ...typography.smallStrong, color: c.muted },
   badgesRow: { gap: 8, paddingVertical: 4, paddingRight: space.lg },
 
   empty: { alignItems: "center", padding: space.xl, gap: 4 },
   emptyEmoji: { fontSize: 38 },
-  emptyTitle: { ...typography.h3, color: colors.text, marginTop: space.sm },
-  emptyBody: { ...typography.body, color: colors.muted, textAlign: "center" },
+  emptyTitle: { ...typography.h3, color: c.text, marginTop: space.sm },
+  emptyBody: { ...typography.body, color: c.muted, textAlign: "center" },
 
   row: {
     flexDirection: "row", alignItems: "center", gap: space.md,
     paddingVertical: space.sm, paddingHorizontal: space.lg,
-    backgroundColor: colors.bgElevated, marginHorizontal: space.lg,
+    backgroundColor: c.bgElevated, marginHorizontal: space.lg,
     marginBottom: space.sm, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border,
+    borderWidth: 1, borderColor: c.border,
   },
-  thumb: { width: 56, height: 56, borderRadius: radius.sm, backgroundColor: "#eee" },
-  rowTitle: { ...typography.bodyStrong, color: colors.text },
-  rowMeta: { ...typography.small, color: colors.muted },
-  rowChevron: { fontSize: 24, color: colors.muted },
+  thumb: { width: 56, height: 56, borderRadius: radius.sm, backgroundColor: c.bg },
+  rowTitle: { ...typography.bodyStrong, color: c.text },
+  rowMeta: { ...typography.small, color: c.muted },
+  rowChevron: { fontSize: 24, color: c.muted },
 });

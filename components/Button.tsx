@@ -1,16 +1,10 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, type ViewStyle } from "react-native";
-import { colors, radius, shadow, typography } from "@/lib/theme";
+import { radius, shadow, typography, useColors, useStyles, type ColorTokens } from "@/lib/theme";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 
 export function Button({
-  label,
-  onPress,
-  loading,
-  disabled,
-  variant = "primary",
-  icon,
-  style,
+  label, onPress, loading, disabled, variant = "primary", icon, style,
 }: {
   label: string;
   onPress?: () => void;
@@ -20,13 +14,16 @@ export function Button({
   icon?: string;
   style?: ViewStyle;
 }) {
-  const palette = {
-    primary: { bg: colors.primary, fg: "#fff", border: colors.primary },
-    secondary: { bg: colors.bgElevated, fg: colors.text, border: colors.borderStrong },
-    ghost: { bg: "transparent", fg: colors.primary, border: "transparent" },
-    danger: { bg: colors.bgElevated, fg: colors.danger, border: colors.border },
-  }[variant];
+  const colors = useColors();
+  const styles = useStyles(mkStyles);
 
+  const palette: Record<Variant, { bg: string; fg: string; border: string }> = {
+    primary:  { bg: colors.primary,    fg: "#fff",         border: colors.primary },
+    secondary:{ bg: colors.bgElevated, fg: colors.text,    border: colors.borderStrong },
+    ghost:    { bg: "transparent",     fg: colors.primary, border: "transparent" },
+    danger:   { bg: colors.bgElevated, fg: colors.danger,  border: colors.border },
+  };
+  const p = palette[variant];
   const isElevated = variant === "primary";
 
   return (
@@ -35,28 +32,24 @@ export function Button({
       disabled={disabled || loading}
       style={({ pressed }) => [
         styles.btn,
-        {
-          backgroundColor: palette.bg,
-          borderColor: palette.border,
-          opacity: disabled ? 0.5 : pressed ? 0.85 : 1,
-        },
+        { backgroundColor: p.bg, borderColor: p.border, opacity: disabled ? 0.5 : pressed ? 0.85 : 1 },
         isElevated && shadow(1),
         style,
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={palette.fg} />
+        <ActivityIndicator color={p.fg} />
       ) : (
         <>
-          {icon ? <Text style={[styles.icon, { color: palette.fg }]}>{icon}</Text> : null}
-          <Text style={[styles.label, { color: palette.fg }]}>{label}</Text>
+          {icon ? <Text style={[styles.icon, { color: p.fg }]}>{icon}</Text> : null}
+          <Text style={[styles.label, { color: p.fg }]}>{label}</Text>
         </>
       )}
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const mkStyles = (_c: ColorTokens) => StyleSheet.create({
   btn: {
     minHeight: 52,
     paddingHorizontal: 18,

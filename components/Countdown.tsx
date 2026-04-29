@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { colors, radius, shadow } from "@/lib/theme";
+import { radius, shadow, useColors, useStyles, type ColorTokens } from "@/lib/theme";
 
 export function Countdown({ expiresAt }: { expiresAt: string }) {
-  const [tick, setTick] = useState(0);
+  const colors = useColors();
+  const styles = useStyles(mkStyles);
+  const [, setTick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setTick((n) => n + 1), 1000);
     return () => clearInterval(t);
@@ -36,22 +38,22 @@ export function Countdown({ expiresAt }: { expiresAt: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const mkStyles = (c: ColorTokens) => StyleSheet.create({
   wrap: {
-    backgroundColor: colors.bgElevated,
+    backgroundColor: c.bgElevated,
     borderRadius: radius.md,
     padding: 14,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
     gap: 10,
   },
   row: { flexDirection: "row", alignItems: "baseline", gap: 8 },
   big: { fontSize: 32, fontWeight: "800", letterSpacing: -1 },
-  label: { color: colors.muted, fontSize: 13, flex: 1 },
+  label: { color: c.muted, fontSize: 13, flex: 1 },
   barTrack: {
     height: 6,
     borderRadius: 3,
-    backgroundColor: colors.border,
+    backgroundColor: c.border,
     overflow: "hidden",
   },
   barFill: { height: "100%", borderRadius: 3 },

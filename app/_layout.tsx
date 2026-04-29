@@ -1,25 +1,22 @@
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, useColorScheme, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { isWelcomeSkipped } from "@/lib/onboarding";
-import { colors } from "@/lib/theme";
+import { useColors } from "@/lib/theme";
 
 function AuthGate() {
+  const colors = useColors();
   const { session, loading, homeSet } = useAuth();
   const segments = useSegments();
   const router = useRouter();
   const [skipChecked, setSkipChecked] = useState<boolean | null>(null);
 
-  // Re-check the "welcome skipped" flag whenever the user changes.
   useEffect(() => {
     let cancelled = false;
-    if (!session?.user?.id) {
-      setSkipChecked(null);
-      return;
-    }
+    if (!session?.user?.id) { setSkipChecked(null); return; }
     isWelcomeSkipped(session.user.id).then((v) => {
       if (!cancelled) setSkipChecked(v);
     });
@@ -37,9 +34,7 @@ function AuthGate() {
       return;
     }
 
-    // Signed in. Need both homeSet status and skipChecked before deciding.
     if (homeSet === null || skipChecked === null) return;
-
     const needsWelcome = !homeSet && !skipChecked;
 
     if (needsWelcome && !onWelcome) {
@@ -58,7 +53,7 @@ function AuthGate() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="welcome" />
@@ -78,10 +73,11 @@ function AuthGate() {
 }
 
 export default function RootLayout() {
+  const scheme = useColorScheme();
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
-        <StatusBar style="dark" />
+        <StatusBar style={scheme === "dark" ? "light" : "dark"} />
         <AuthGate />
       </AuthProvider>
     </GestureHandlerRootView>

@@ -1,25 +1,28 @@
 import { StyleSheet, Text, View, type ViewStyle } from "react-native";
-import { colors, radius, typography } from "@/lib/theme";
+import { radius, typography, useColors, type ColorTokens } from "@/lib/theme";
 
 export function Pill({
-  label,
-  tone = "neutral",
-  style,
+  label, tone = "neutral", style,
 }: {
   label: string;
   tone?: "neutral" | "live" | "warn" | "claimed" | "primary";
   style?: ViewStyle;
 }) {
+  const colors = useColors();
   const palette = {
-    neutral: { bg: colors.bg, fg: colors.muted, border: colors.border },
-    live: { bg: "#e8f5ee", fg: colors.success, border: "#bfe5cf" },
-    warn: { bg: "#fff5e6", fg: colors.warn, border: "#f4d9aa" },
-    claimed: { bg: "#f0f0f0", fg: colors.muted, border: colors.border },
-    primary: { bg: "#fde8e3", fg: colors.primaryDark, border: "#f5c5b8" },
+    neutral: { bg: colors.bg,            fg: colors.muted, border: colors.border },
+    live:    { bg: colors.liveSurface,   fg: colors.success, border: colors.liveBorder },
+    warn:    { bg: colors.warnSurface,   fg: colors.warn,    border: colors.warnBorder },
+    claimed: { bg: colors.bg,            fg: colors.muted, border: colors.border },
+    primary: { bg: colors.primarySurface,fg: colors.primaryDark, border: colors.primaryBorder },
   }[tone];
 
   return (
-    <View style={[styles.pill, { backgroundColor: palette.bg, borderColor: palette.border }, style]}>
+    <View style={[
+      styles.pill,
+      { backgroundColor: palette.bg, borderColor: palette.border },
+      style,
+    ]}>
       <Text style={[styles.text, { color: palette.fg }]}>{label}</Text>
     </View>
   );
@@ -35,3 +38,6 @@ const styles = StyleSheet.create({
   },
   text: { ...typography.tiny, textTransform: "uppercase" },
 });
+
+// Suppress unused import warning by referencing the type (no-op).
+type _ = ColorTokens;

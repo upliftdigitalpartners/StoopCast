@@ -13,10 +13,9 @@ import * as Location from "expo-location";
 import { useFocusEffect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "@/lib/supabase";
-import { CategoryChip } from "@/components/CategoryChip";
 import { Pill } from "@/components/Pill";
 import { Button } from "@/components/Button";
-import { colors, radius, shadow, space, typography } from "@/lib/theme";
+import { radius, shadow, space, typography, useColors, useStyles, type ColorTokens } from "@/lib/theme";
 import { timeAgo } from "@/lib/time";
 import { formatDistance } from "@/lib/distance";
 import { categoryOf } from "@/lib/categories";
@@ -24,6 +23,8 @@ import { buzz } from "@/lib/haptics";
 import type { ActivityRow } from "@/lib/types";
 
 export default function ActivityScreen() {
+  const colors = useColors();
+  const styles = useStyles(mkStyles);
   const router = useRouter();
   const [rows, setRows] = useState<ActivityRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,7 +48,6 @@ export default function ActivityScreen() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
-
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const onRefresh = async () => {
@@ -77,20 +77,13 @@ export default function ActivityScreen() {
         data={rows}
         keyExtractor={(r) => r.id}
         contentContainerStyle={{ padding: space.lg, gap: space.sm, paddingBottom: space.xxl }}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyEmoji}>👀</Text>
             <Text style={styles.h2}>Quiet on your block</Text>
             <Text style={styles.bodyMuted}>No stoop finds in the last 2 days.</Text>
-            <Button
-              label="Post a find"
-              icon="📷"
-              onPress={() => router.push("/(tabs)/post")}
-              style={{ marginTop: space.md }}
-            />
+            <Button label="Post a find" icon="📷" onPress={() => router.push("/(tabs)/post")} style={{ marginTop: space.md }} />
           </View>
         }
         renderItem={({ item }) => {
@@ -125,27 +118,27 @@ export default function ActivityScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: space.xl, gap: 6 },
+const mkStyles = (c: ColorTokens) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.bg },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: space.xl, gap: 6, backgroundColor: c.bg },
   header: { padding: space.lg, paddingBottom: 0, gap: 4 },
-  h1: { ...typography.h1, color: colors.text },
-  h2: { ...typography.h2, color: colors.text },
-  sub: { ...typography.body, color: colors.muted },
-  bodyMuted: { ...typography.body, color: colors.muted, textAlign: "center" },
+  h1: { ...typography.h1, color: c.text },
+  h2: { ...typography.h2, color: c.text },
+  sub: { ...typography.body, color: c.muted },
+  bodyMuted: { ...typography.body, color: c.muted, textAlign: "center" },
   empty: { alignItems: "center", padding: space.xl, gap: 4 },
   emptyEmoji: { fontSize: 38 },
 
   row: {
     flexDirection: "row", alignItems: "center", gap: space.md,
-    backgroundColor: colors.bgElevated,
+    backgroundColor: c.bgElevated,
     borderRadius: radius.md, padding: space.sm,
-    borderWidth: 1, borderColor: colors.border,
+    borderWidth: 1, borderColor: c.border,
   },
-  thumb: { width: 64, height: 64, borderRadius: radius.sm, backgroundColor: "#eee" },
+  thumb: { width: 64, height: 64, borderRadius: radius.sm, backgroundColor: c.bg },
   catEmoji: { fontSize: 16 },
-  title: { ...typography.bodyStrong, color: colors.text, flex: 1 },
-  meta: { ...typography.small, color: colors.textSoft, fontWeight: "600" },
-  metaSoft: { ...typography.small, color: colors.muted },
-  chev: { fontSize: 24, color: colors.muted },
+  title: { ...typography.bodyStrong, color: c.text, flex: 1 },
+  meta: { ...typography.small, color: c.textSoft, fontWeight: "600" },
+  metaSoft: { ...typography.small, color: c.muted },
+  chev: { fontSize: 24, color: c.muted },
 });

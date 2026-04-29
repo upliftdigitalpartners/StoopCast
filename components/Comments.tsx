@@ -10,11 +10,13 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { buzz } from "@/lib/haptics";
-import { colors, radius, space, typography } from "@/lib/theme";
+import { radius, space, typography, useColors, useStyles, type ColorTokens } from "@/lib/theme";
 import { timeAgo } from "@/lib/time";
 import type { CommentRow } from "@/lib/types";
 
 export function Comments({ postId }: { postId: string }) {
+  const colors = useColors();
+  const styles = useStyles(mkStyles);
   const { session } = useAuth();
   const [rows, setRows] = useState<CommentRow[]>([]);
   const [text, setText] = useState("");
@@ -27,7 +29,6 @@ export function Comments({ postId }: { postId: string }) {
 
   useEffect(() => { load(); }, [load]);
 
-  // Realtime: any new comment for this post pulls a fresh list.
   useEffect(() => {
     const ch = supabase
       .channel(`comments:${postId}`)
@@ -106,19 +107,19 @@ export function Comments({ postId }: { postId: string }) {
   );
 }
 
-const styles = StyleSheet.create({
-  heading: { ...typography.h3, color: colors.text },
-  empty: { ...typography.small, color: colors.muted, fontStyle: "italic" },
+const mkStyles = (c: ColorTokens) => StyleSheet.create({
+  heading: { ...typography.h3, color: c.text },
+  empty: { ...typography.small, color: c.muted, fontStyle: "italic" },
   row: { flexDirection: "row", gap: space.sm, paddingVertical: 6 },
   avatar: {
     width: 30, height: 30, borderRadius: 15,
-    backgroundColor: colors.accent,
+    backgroundColor: c.accent,
     alignItems: "center", justifyContent: "center",
   },
   avatarText: { color: "#fff", fontWeight: "800", fontSize: 11 },
-  handle: { ...typography.smallStrong, color: colors.text },
-  handleMeta: { ...typography.small, color: colors.muted, fontWeight: "400" },
-  body: { ...typography.body, color: colors.text, marginTop: 2 },
+  handle: { ...typography.smallStrong, color: c.text },
+  handleMeta: { ...typography.small, color: c.muted, fontWeight: "400" },
+  body: { ...typography.body, color: c.text, marginTop: 2 },
 
   composer: {
     flexDirection: "row", gap: space.sm, marginTop: space.sm,
@@ -126,13 +127,13 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1, minHeight: 40, maxHeight: 120,
-    borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
+    borderWidth: 1, borderColor: c.border, borderRadius: radius.md,
     paddingHorizontal: space.md, paddingVertical: 10,
-    color: colors.text, fontSize: 15, backgroundColor: colors.bgElevated,
+    color: c.text, fontSize: 15, backgroundColor: c.bgElevated,
   },
   send: {
     paddingHorizontal: 16, paddingVertical: 10,
-    backgroundColor: colors.primary, borderRadius: radius.md,
+    backgroundColor: c.primary, borderRadius: radius.md,
   },
   sendText: { color: "#fff", fontWeight: "700" },
 });

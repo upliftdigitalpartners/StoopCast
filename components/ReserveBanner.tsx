@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { colors, radius, typography } from "@/lib/theme";
+import { radius, typography, useStyles, type ColorTokens } from "@/lib/theme";
 
 export function ReserveBanner({ reservedUntil }: { reservedUntil: string }) {
+  const styles = useStyles(mkStyles);
   const [, setTick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setTick((n) => n + 1), 1000);
@@ -27,14 +28,14 @@ export function ReserveBanner({ reservedUntil }: { reservedUntil: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const mkStyles = (c: ColorTokens) => StyleSheet.create({
   wrap: {
     flexDirection: "row", alignItems: "center", gap: 12,
-    backgroundColor: "#fff5e6",
-    borderColor: "#f4d9aa", borderWidth: 1,
+    backgroundColor: c.warnSurface,
+    borderColor: c.warnBorder, borderWidth: 1,
     borderRadius: radius.md, padding: 12,
   },
   emoji: { fontSize: 22 },
-  title: { ...typography.bodyStrong, color: colors.text },
-  sub: { ...typography.small, color: colors.muted, marginTop: 2 },
+  title: { ...typography.bodyStrong, color: c.text },
+  sub: { ...typography.small, color: c.muted, marginTop: 2 },
 });

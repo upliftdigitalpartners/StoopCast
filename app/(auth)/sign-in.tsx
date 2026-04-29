@@ -14,11 +14,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/Button";
 import { buzz } from "@/lib/haptics";
-import { colors, radius, shadow, space, typography } from "@/lib/theme";
+import { radius, shadow, space, typography, useColors, useStyles, type ColorTokens } from "@/lib/theme";
 
 type Mode = "signin" | "signup" | "reset";
 
 export default function SignInScreen() {
+  const colors = useColors();
+  const styles = useStyles(mkStyles);
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,8 +37,7 @@ export default function SignInScreen() {
     try {
       if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
-          email,
-          password,
+          email, password,
           options: { data: handle ? { handle } : undefined },
         });
         if (error) throw error;
@@ -53,10 +54,7 @@ export default function SignInScreen() {
         });
         if (error) throw error;
         buzz.success();
-        Alert.alert(
-          "Check your email",
-          "We sent a link to reset your password. Open it on this phone to finish.",
-        );
+        Alert.alert("Check your email", "We sent a link to reset your password. Open it on this phone to finish.");
         setMode("signin");
       }
     } catch (e: any) {
@@ -77,10 +75,7 @@ export default function SignInScreen() {
       });
       if (error) throw error;
       buzz.success();
-      Alert.alert(
-        "Check your email",
-        "We sent a magic link. Tap it on this phone to sign in — no password needed.",
-      );
+      Alert.alert("Check your email", "We sent a magic link. Tap it on this phone to sign in — no password needed.");
     } catch (e: any) {
       buzz.error();
       Alert.alert("Couldn't send", e.message ?? String(e));
@@ -109,35 +104,19 @@ export default function SignInScreen() {
             </View>
           ) : (
             <View style={styles.tabs}>
-              <Tab label="Sign in" active={mode === "signin"} onPress={() => setMode("signin")} />
-              <Tab label="Sign up" active={mode === "signup"} onPress={() => setMode("signup")} />
+              <Tab label="Sign in" active={mode === "signin"} onPress={() => setMode("signin")} colors={colors} />
+              <Tab label="Sign up" active={mode === "signup"} onPress={() => setMode("signup")} colors={colors} />
             </View>
           )}
 
           {mode === "signup" && (
-            <Field
-              label="Handle (optional)"
-              placeholder="stoopking"
-              value={handle}
-              onChangeText={setHandle}
-            />
+            <Field label="Handle (optional)" placeholder="stoopking" value={handle} onChangeText={setHandle} colors={colors} />
           )}
 
-          <Field
-            label="Email"
-            placeholder="you@example.com"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-          />
+          <Field label="Email" placeholder="you@example.com" value={email} onChangeText={setEmail} keyboardType="email-address" colors={colors} />
 
           {mode !== "reset" && (
-            <PasswordField
-              value={password}
-              onChangeText={setPassword}
-              show={showPw}
-              onToggle={() => setShowPw((v) => !v)}
-            />
+            <PasswordField value={password} onChangeText={setPassword} show={showPw} onToggle={() => setShowPw((v) => !v)} colors={colors} />
           )}
 
           {mode === "signin" ? (
@@ -147,13 +126,7 @@ export default function SignInScreen() {
           ) : null}
 
           <Button
-            label={
-              mode === "signin"
-                ? "Sign in"
-                : mode === "signup"
-                  ? "Create account"
-                  : "Email reset link"
-            }
+            label={mode === "signin" ? "Sign in" : mode === "signup" ? "Create account" : "Email reset link"}
             icon={mode === "signin" ? "→" : mode === "signup" ? "✨" : "✉️"}
             onPress={submit}
             loading={busy}
@@ -166,13 +139,7 @@ export default function SignInScreen() {
           )}
 
           {mode !== "reset" && (
-            <Button
-              label="Send magic link"
-              icon="🔮"
-              variant="secondary"
-              onPress={sendMagicLink}
-              loading={busyMagic}
-            />
+            <Button label="Send magic link" icon="🔮" variant="secondary" onPress={sendMagicLink} loading={busyMagic} />
           )}
 
           {mode === "reset" ? (
@@ -188,26 +155,34 @@ export default function SignInScreen() {
   );
 }
 
-function Tab({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+function Tab({ label, active, onPress, colors }: { label: string; active: boolean; onPress: () => void; colors: ColorTokens }) {
   return (
-    <Pressable onPress={onPress} style={[styles.tab, active && styles.tabActive]}>
-      <Text style={[styles.tabText, active && styles.tabTextActive]}>{label}</Text>
+    <Pressable onPress={onPress} style={[
+      { flex: 1, paddingVertical: 10, borderRadius: radius.sm, alignItems: "center" },
+      active && { backgroundColor: colors.bgElevated, ...shadow(1) },
+    ]}>
+      <Text style={[typography.bodyStrong, { color: active ? colors.text : colors.muted }]}>{label}</Text>
     </Pressable>
   );
 }
 
 function Field({
-  label, placeholder, value, onChangeText, keyboardType,
+  label, placeholder, value, onChangeText, keyboardType, colors,
 }: {
   label: string; placeholder: string;
   value: string; onChangeText: (s: string) => void;
   keyboardType?: "default" | "email-address";
+  colors: ColorTokens;
 }) {
   return (
     <View style={{ gap: 6 }}>
-      <Text style={styles.fieldLabel}>{label}</Text>
+      <Text style={{ ...typography.smallStrong, color: colors.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>{label}</Text>
       <TextInput
-        style={styles.input}
+        style={{
+          borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
+          padding: space.md, fontSize: 16, color: colors.text,
+          backgroundColor: colors.inputBg,
+        }}
         placeholder={placeholder}
         autoCapitalize="none"
         autoCorrect={false}
@@ -221,17 +196,22 @@ function Field({
 }
 
 function PasswordField({
-  value, onChangeText, show, onToggle,
+  value, onChangeText, show, onToggle, colors,
 }: {
   value: string; onChangeText: (s: string) => void;
   show: boolean; onToggle: () => void;
+  colors: ColorTokens;
 }) {
   return (
     <View style={{ gap: 6 }}>
-      <Text style={styles.fieldLabel}>Password</Text>
-      <View style={styles.pwWrap}>
+      <Text style={{ ...typography.smallStrong, color: colors.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>Password</Text>
+      <View style={{ position: "relative", justifyContent: "center" }}>
         <TextInput
-          style={[styles.input, styles.pwInput]}
+          style={{
+            borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
+            padding: space.md, fontSize: 16, color: colors.text,
+            backgroundColor: colors.inputBg, paddingRight: 64,
+          }}
           placeholder="••••••••"
           autoCapitalize="none"
           autoCorrect={false}
@@ -240,67 +220,49 @@ function PasswordField({
           onChangeText={onChangeText}
           placeholderTextColor={colors.muted}
         />
-        <Pressable onPress={onToggle} style={styles.pwToggle} hitSlop={8}>
-          <Text style={styles.pwToggleText}>{show ? "Hide" : "Show"}</Text>
+        <Pressable onPress={onToggle} style={{ position: "absolute", right: 12, top: 0, bottom: 0, justifyContent: "center", paddingHorizontal: 4 }} hitSlop={8}>
+          <Text style={{ ...typography.smallStrong, color: colors.primary }}>{show ? "Hide" : "Show"}</Text>
         </Pressable>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg },
+const mkStyles = (c: ColorTokens) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.bg },
   kav: { flex: 1, padding: space.lg, justifyContent: "center", gap: space.lg },
   brand: { alignItems: "center", gap: 6 },
   logo: { width: 84, height: 84, borderRadius: 22, marginBottom: space.sm },
-  logoText: { ...typography.h1, color: colors.text },
-  tagline: { ...typography.body, color: colors.muted, textAlign: "center" },
+  logoText: { ...typography.h1, color: c.text },
+  tagline: { ...typography.body, color: c.muted, textAlign: "center" },
 
   card: {
-    backgroundColor: colors.bgElevated,
+    backgroundColor: c.bgElevated,
     borderRadius: radius.lg,
     padding: space.lg,
-    borderWidth: 1, borderColor: colors.border,
+    borderWidth: 1, borderColor: c.border,
     gap: space.md,
   },
   resetHeader: { gap: 4 },
-  resetTitle: { ...typography.h3, color: colors.text },
-  resetSub: { ...typography.small, color: colors.muted },
+  resetTitle: { ...typography.h3, color: c.text },
+  resetSub: { ...typography.small, color: c.muted },
 
   tabs: {
     flexDirection: "row",
-    backgroundColor: colors.bg,
+    backgroundColor: c.bg,
     borderRadius: radius.md,
     padding: 4, gap: 4,
   },
-  tab: { flex: 1, paddingVertical: 10, borderRadius: radius.sm, alignItems: "center" },
-  tabActive: { backgroundColor: colors.bgElevated, ...shadow(1) },
-  tabText: { ...typography.bodyStrong, color: colors.muted },
-  tabTextActive: { color: colors.text },
-
-  fieldLabel: { ...typography.smallStrong, color: colors.muted, textTransform: "uppercase", letterSpacing: 0.4 },
-  input: {
-    borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
-    padding: space.md, fontSize: 16, color: colors.text,
-    backgroundColor: colors.bg,
-  },
-  pwWrap: { position: "relative", justifyContent: "center" },
-  pwInput: { paddingRight: 64 },
-  pwToggle: {
-    position: "absolute", right: 12, top: 0, bottom: 0,
-    justifyContent: "center", paddingHorizontal: 4,
-  },
-  pwToggleText: { ...typography.smallStrong, color: colors.primary },
 
   forgotBtn: { alignSelf: "flex-end", marginTop: -4, padding: 4 },
-  forgotText: { ...typography.smallStrong, color: colors.primary },
+  forgotText: { ...typography.smallStrong, color: c.primary },
 
   divider: { flexDirection: "row", alignItems: "center", gap: space.sm, marginVertical: 4 },
-  line: { flex: 1, height: 1, backgroundColor: colors.border },
-  dividerText: { ...typography.small, color: colors.muted },
+  line: { flex: 1, height: 1, backgroundColor: c.border },
+  dividerText: { ...typography.small, color: c.muted },
 
   backBtn: { alignSelf: "center", padding: space.sm },
-  backText: { ...typography.smallStrong, color: colors.primary },
+  backText: { ...typography.smallStrong, color: c.primary },
 
-  footer: { ...typography.small, color: colors.muted, textAlign: "center" },
+  footer: { ...typography.small, color: c.muted, textAlign: "center" },
 });

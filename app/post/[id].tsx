@@ -25,7 +25,7 @@ import { PhotoCarousel } from "@/components/PhotoCarousel";
 import { Comments } from "@/components/Comments";
 import { ReserveBanner } from "@/components/ReserveBanner";
 import { buzz } from "@/lib/haptics";
-import { colors, radius, shadow, space, typography } from "@/lib/theme";
+import { radius, shadow, space, typography, useColors, useStyles, type ColorTokens } from "@/lib/theme";
 import { minutesLeft, timeAgo } from "@/lib/time";
 import { formatDistance } from "@/lib/distance";
 import type { Post } from "@/lib/types";
@@ -40,6 +40,8 @@ type DetailRow = Post & {
 };
 
 export default function PostDetail() {
+  const colors = useColors();
+  const styles = useStyles(mkStyles);
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { session } = useAuth();
@@ -56,16 +58,10 @@ export default function PostDetail() {
     if (error || !p) { setLoading(false); return; }
 
     const { data: prof } = await supabase
-      .from("profiles")
-      .select("handle, karma")
-      .eq("id", (p as Post).poster_id)
-      .single();
+      .from("profiles").select("handle, karma").eq("id", (p as Post).poster_id).single();
 
     const { data: claim } = await supabase
-      .from("claims")
-      .select("reserved_until")
-      .eq("post_id", id)
-      .maybeSingle();
+      .from("claims").select("reserved_until").eq("post_id", id).maybeSingle();
 
     let lat = 0, lng = 0;
     const { data: feed } = await supabase.rpc("nearby_posts", { lat: 0, lng: 0, radius_m: 999_999_999 });
@@ -301,11 +297,7 @@ export default function PostDetail() {
                 }}
                 pointerEvents="none"
               >
-                <Marker
-                  coordinate={{ latitude: row.lat, longitude: row.lng }}
-                  anchor={{ x: 0.5, y: 1 }}
-                  tracksViewChanges={false}
-                >
+                <Marker coordinate={{ latitude: row.lat, longitude: row.lng }} anchor={{ x: 0.5, y: 1 }} tracksViewChanges={false}>
                   <MapPin minutesLeft={minsLeft} status={row.status} />
                 </Marker>
               </MapView>
@@ -357,9 +349,9 @@ export default function PostDetail() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
+const mkStyles = (c: ColorTokens) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: c.bg },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: c.bg },
 
   heroOverlay: {
     position: "absolute", left: 0, right: 0, bottom: 0,
@@ -368,46 +360,46 @@ const styles = StyleSheet.create({
   },
   heroBtn: {
     width: 38, height: 38, borderRadius: 19,
-    backgroundColor: "rgba(255,255,255,0.95)",
+    backgroundColor: c.bgElevated,
     alignItems: "center", justifyContent: "center",
   },
-  heroBtnText: { fontSize: 16 },
+  heroBtnText: { fontSize: 16, color: c.text },
 
   actionsMenu: {
     position: "absolute", right: space.md, top: -4,
-    backgroundColor: colors.bgElevated, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border, minWidth: 200,
+    backgroundColor: c.bgElevated, borderRadius: radius.md,
+    borderWidth: 1, borderColor: c.border, minWidth: 200,
   },
   actionItem: { paddingHorizontal: 14, paddingVertical: 12 },
-  actionText: { ...typography.bodyStrong, color: colors.text },
-  menuSep: { height: 1, backgroundColor: colors.border, marginHorizontal: 8 },
+  actionText: { ...typography.bodyStrong, color: c.text },
+  menuSep: { height: 1, backgroundColor: c.border, marginHorizontal: 8 },
 
   body: { padding: space.lg, gap: space.md },
 
   titleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: space.md },
-  title: { ...typography.h1, color: colors.text, flex: 1 },
+  title: { ...typography.h1, color: c.text, flex: 1 },
 
   posterRow: {
     flexDirection: "row", alignItems: "center", gap: space.md,
-    backgroundColor: colors.bgElevated, padding: space.sm, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border,
+    backgroundColor: c.bgElevated, padding: space.sm, borderRadius: radius.md,
+    borderWidth: 1, borderColor: c.border,
   },
   avatar: {
     width: 36, height: 36, borderRadius: 18,
-    backgroundColor: colors.primary, alignItems: "center", justifyContent: "center",
+    backgroundColor: c.primary, alignItems: "center", justifyContent: "center",
   },
   avatarText: { color: "#fff", fontWeight: "800", fontSize: 13 },
-  posterName: { ...typography.bodyStrong, color: colors.text },
-  posterMeta: { ...typography.small, color: colors.muted },
+  posterName: { ...typography.bodyStrong, color: c.text },
+  posterMeta: { ...typography.small, color: c.muted },
 
   descCard: {
-    backgroundColor: colors.bgElevated,
+    backgroundColor: c.bgElevated,
     padding: space.md, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border,
+    borderWidth: 1, borderColor: c.border,
   },
-  desc: { ...typography.body, color: colors.text, lineHeight: 22 },
+  desc: { ...typography.body, color: c.text, lineHeight: 22 },
 
-  mapWrap: { borderRadius: radius.md, overflow: "hidden", borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card },
+  mapWrap: { borderRadius: radius.md, overflow: "hidden", borderWidth: 1, borderColor: c.border, backgroundColor: c.card },
   map: { width: "100%", height: 200 },
   distancePill: {
     position: "absolute", bottom: 10, left: 10,
@@ -419,26 +411,26 @@ const styles = StyleSheet.create({
   actionBar: {
     position: "absolute", left: 0, right: 0, bottom: 0,
     paddingHorizontal: space.lg, paddingTop: space.md,
-    backgroundColor: colors.bgElevated,
-    borderTopWidth: 1, borderTopColor: colors.border,
+    backgroundColor: c.bgElevated,
+    borderTopWidth: 1, borderTopColor: c.border,
   },
 
   reportBackdrop: {
     position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: "rgba(20,20,20,0.55)",
+    backgroundColor: c.overlay,
     alignItems: "center", justifyContent: "center", padding: space.lg,
   },
   reportSheet: {
-    backgroundColor: colors.bgElevated, borderRadius: radius.lg,
+    backgroundColor: c.bgElevated, borderRadius: radius.lg,
     padding: space.lg, gap: space.md, width: "100%",
-    borderWidth: 1, borderColor: colors.border,
+    borderWidth: 1, borderColor: c.border,
   },
-  reportTitle: { ...typography.h3, color: colors.text },
-  reportSub: { ...typography.small, color: colors.muted, marginTop: -8 },
+  reportTitle: { ...typography.h3, color: c.text },
+  reportSub: { ...typography.small, color: c.muted, marginTop: -8 },
   reportInput: {
     minHeight: 80,
-    borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
-    padding: space.md, backgroundColor: colors.bg, color: colors.text,
+    borderWidth: 1, borderColor: c.border, borderRadius: radius.md,
+    padding: space.md, backgroundColor: c.inputBg, color: c.text,
     fontSize: 15, textAlignVertical: "top",
   },
 });
